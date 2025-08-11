@@ -23,6 +23,11 @@ def on_startup():
     """
     init_db()
 
+@app.get("/health")
+def health():
+    """Simple healthcheck for Docker healthcheck."""
+    return {"ok": True}
+
 # Register API routers
 app.include_router(cards.router)
 app.include_router(study.router)
