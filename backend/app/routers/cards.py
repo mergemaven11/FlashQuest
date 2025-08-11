@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
+from typing import List, Dict, Any
+from datetime import datetime
 from ..db import get_session
 from ..models import Card, UserCard
 
@@ -36,3 +38,29 @@ def list_cards(session: Session = Depends(get_session)):
         list[Card]: All cards sorted by most recent creation first.
     """
     return session.exec(select(Card).order_by(Card.id.desc())).all()
+
+@router.get("/admin", response_model=List[Dict[str, Any]])
+def list_cards_admin(session: Session = Depends(get_session)):
+    """
+    List cards with user-study status for the admin view.
+
+    Returns:
+        List[dict]: Each item includes card fields plus bin, wrong_count, next_review_at, and status.
+    """
+    rows = session.exec(
+        select(Card, UserCard).join(UserCard, UserCard.card_id == Card.id)
+        .order_by(Card.id.desc())
+    ).all()
+
+    out: List[Dict[str, Any]] = []
+    for card, uc in rows:
+        out.append({
+            "id": card.id,
+            "word": card.word,
+            "definition": card.definition,
+            "bin": uc.bin,
+            "wrong_count": uc.wrong_count,
+            "next_review_at": uc.next_review_at.isoformat() if isinstance(uc.next_review_at, datetime) and uc.next_review_at else None,
+            "status": uc.status,
+        })
+    return out
