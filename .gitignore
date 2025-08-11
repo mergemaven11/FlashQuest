@@ -1,0 +1,24 @@
+# Node
+node_modules/
+dist/
+.vite/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+
+# Poetry
+poetry.lock
+
+# macOS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Docker
+*.pid
+docker-data/
