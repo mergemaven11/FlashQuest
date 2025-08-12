@@ -230,6 +230,16 @@ npm run dev
 
 ---
 
+**Tiny example**
+
+1) New card starts in **bin 0** → drawn when nothing is due.
+2) You answer **correct** → moves to **bin 1**, `next_review_at = now + 5s`.
+3) After 5s, it’s **due**. If you answer **wrong** → **bin 1** again, `wrong_count++`.
+4) Keep getting it right → climbs bins; reaching **bin 11** sets status **never**.
+5) If `wrong_count = 10` at any point → status **hard_to_remember** (hidden forever).
+
+---
+
 ## License
 
 Assessment purposes only (private repo).

@@ -5,6 +5,14 @@ export type Card = {
   definition: string;
 };
 
+/** Admin listing model with status fields. */
+export type AdminCard = Card & {
+  bin: number;
+  wrong_count: number;
+  next_review_at: string | null;
+  status: "active" | "never" | "hard_to_remember";
+};
+
 /** API response when requesting the next card to study. */
 export type NextResponse =
   | { status: "ok"; card: Card }
