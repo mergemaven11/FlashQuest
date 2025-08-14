@@ -1,135 +1,171 @@
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
+from sqlalchemy import func 
+from app.models import Card, CardCreate, CardRead, CardAdminRead, CardUpdate, UserCard, CardStats
+from app.db import get_session  # adjust import if needed
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, delete
+router = APIRouter()
+DEFAULT_USER_ID = 1  
 
-from ..db import get_session
-from ..models import Card, UserCard, Review
-from ..schemas import CardCreate, CardUpdate, AdminCard, Stats
 
-router = APIRouter(prefix="/cards", tags=["cards"])
-
-@router.post("", response_model=Card)
+@router.post("/cards", response_model=CardRead)
 def create_card(payload: CardCreate, session: Session = Depends(get_session)):
-    """
-    Create a new vocabulary card and initialize its user tracking at bin 0.
+    """Create a new vocabulary card.
 
     Args:
-        payload: CardCreate with word/definition.
-        session: DB session.
+        payload (CardCreate): The data for the new card.
+        session (Session): The database session.
 
     Returns:
-        The created Card record.
+        CardRead: The newly created card with its assigned ID and timestamp.
     """
-    card = Card(word=payload.word, definition=payload.definition)
+    card = Card(**payload.model_dump())
     session.add(card)
     session.commit()
     session.refresh(card)
 
-    session.add(UserCard(card_id=card.id, bin=0))
+    # Ensure per-user tracking exists so /cards/admin can include bin/status
+    uc = UserCard(user_id=DEFAULT_USER_ID, card_id=card.id)  # defaults: bin=0, status='active'
+    session.add(uc)
     session.commit()
+
     return card
 
-@router.get("", response_model=List[Card])
+
+@router.get("/cards", response_model=list[CardRead])
 def list_cards(session: Session = Depends(get_session)):
-    """
-    Retrieve all cards (basic listing for convenience).
-    """
-    return session.exec(select(Card).order_by(Card.id.desc())).all()
+    """Retrieve all vocabulary cards.
 
-@router.get("/admin", response_model=List[AdminCard])
-def list_cards_admin(
-    q: Optional[str] = Query(default=None, description="Filter by word/definition contains"),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    session: Session = Depends(get_session),
-):
-    """
-    Admin view: list cards with study status, filterable/paged.
+    Args:
+        session (Session): The database session.
 
-    Ordering: newest Card first.
+    Returns:
+        list[CardRead]: A list of all cards in the database.
     """
-    stmt = select(Card, UserCard).join(UserCard, UserCard.card_id == Card.id)
+    return session.exec(select(Card)).all()
+
+
+@router.put("/cards/{card_id}", response_model=CardRead)
+def replace_card(card_id: int, payload: CardUpdate, session: Session = Depends(get_session)):
+    """PUT: accept partial fields (acts like an upsert-style replace for this API)."""
+    card = session.get(Card, card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        setattr(card, k, v)
+    session.add(card)
+    session.commit()
+    session.refresh(card)
+    return card
+
+@router.patch("/cards/{card_id}", response_model=CardRead)
+def update_card(card_id: int, payload: CardUpdate, session: Session = Depends(get_session)):
+    """PATCH: partial update; only provided fields are changed."""
+    card = session.get(Card, card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        setattr(card, k, v)
+    session.add(card)
+    session.commit()
+    session.refresh(card)
+    return card
+
+
+@router.delete("/cards/{card_id}")
+def delete_card(card_id: int, session: Session = Depends(get_session)):
+    """Delete a vocabulary card.
+
+    Args:
+        card_id (int): The ID of the card to delete.
+        session (Session): The database session.
+
+    Raises:
+        HTTPException: If the card does not exist.
+
+    Returns:
+        dict: A confirmation message indicating success.
+    """
+    card = session.get(Card, card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    session.delete(card)
+    session.commit()
+    return {"ok": True}
+
+@router.get("/cards/admin", response_model=list[CardAdminRead])
+def list_cards_admin(q: str | None = None, session: Session = Depends(get_session)):
+    """
+    Admin listing: return cards with per-user study fields.
+    Supports optional search by `q` matching card.word or card.definition.
+    """
+    stmt = (
+        select(Card, UserCard)
+        .join(UserCard, UserCard.card_id == Card.id)
+        .where(UserCard.user_id == DEFAULT_USER_ID)
+        .order_by(Card.id)
+    )
+
     if q:
-        like = f"%{q.lower()}%"
-        # naive filter by lower(word/definition); SQLModel portable approach:
-        stmt = stmt.where(Card.word.ilike(like) | Card.definition.ilike(like))  # type: ignore[attr-defined]
-    stmt = stmt.order_by(Card.id.desc()).limit(limit).offset(offset)
+        like_pattern = f"%{q}%"
+        stmt = stmt.where(
+            (Card.word.ilike(like_pattern)) | (Card.definition.ilike(like_pattern))
+        )
 
     rows = session.exec(stmt).all()
-    out: List[AdminCard] = []
-    for card, uc in rows:
-        out.append(AdminCard(
+
+    return [
+        CardAdminRead(
             id=card.id,
             word=card.word,
             definition=card.definition,
+            created_at=card.created_at,
             bin=uc.bin,
-            wrong_count=uc.wrong_count,
-            next_review_at=uc.next_review_at.isoformat() if isinstance(uc.next_review_at, datetime) and uc.next_review_at else None,
             status=uc.status,
-        ))
-    return out
+        )
+        for card, uc in rows
+    ]
 
-@router.get("/stats", response_model=Stats)
-def admin_stats(session: Session = Depends(get_session)):
+@router.get("/cards/stats", response_model=CardStats)
+def card_stats(session: Session = Depends(get_session)):
     """
-    Summary counts for admin: totals and per-bin distribution.
+    Return aggregate study stats for the default user:
+    - total_cards: number of tracked cards
+    - active/never/hard_to_remember: counts by status
+    - by_bin: counts per bin (0..11), missing bins reported as 0
     """
-    total_cards = session.exec(select(Card)).count()
-    statuses = {"active": 0, "never": 0, "hard_to_remember": 0}
-    by_bin: Dict[int, int] = {i: 0 for i in range(0, 12)}
+    # total cards traced for this user
+    total_cards = session.exec(
+        select(func.count()).select_from(UserCard).where(UserCard.user_id == DEFAULT_USER_ID)
+    ).one()
 
-    for uc in session.exec(select(UserCard)).all():
-        statuses[uc.status] = statuses.get(uc.status, 0) + 1
-        if 0 <= uc.bin <= 11:
-            by_bin[uc.bin] += 1
+    # counts by status
+    status_rows = session.exec(
+        select(UserCard.status, func.count())
+        .where(UserCard.user_id == DEFAULT_USER_ID)
+        .group_by(UserCard.status)
+    ).all()
+    status_counts = {s: c for s, c in status_rows}
+    active = int(status_counts.get("active", 0))
+    never = int(status_counts.get("never", 0))
+    hard_to_remember = int(status_counts.get("hard_to_remember", 0))
 
-    return Stats(
-        total_cards=total_cards,
-        active=statuses.get("active", 0),
-        never=statuses.get("never", 0),
-        hard_to_remember=statuses.get("hard_to_remember", 0),
+    # counts by bin
+    bin_rows = session.exec(
+        select(UserCard.bin, func.count())
+        .where(UserCard.user_id == DEFAULT_USER_ID)
+        .group_by(UserCard.bin)
+    ).all()
+    by_bin = {i: 0 for i in range(12)}
+    for b, c in bin_rows:
+        by_bin[int(b)] = int(c)
+
+    return CardStats(
+        total_cards=int(total_cards),
+        active=active,
+        never=never,
+        hard_to_remember=hard_to_remember,
         by_bin=by_bin,
     )
-
-@router.put("/{card_id}", response_model=Card)
-def update_card(card_id: int, payload: CardUpdate, session: Session = Depends(get_session)):
-    """
-    Update a card's word/definition (partial allowed).
-
-    Raises:
-        404 if card not found.
-    """
-    card = session.get(Card, card_id)
-    if not card:
-        raise HTTPException(404, "Card not found")
-
-    if payload.word is not None:
-        card.word = payload.word
-    if payload.definition is not None:
-        card.definition = payload.definition
-
-    session.add(card)
-    session.commit()
-    session.refresh(card)
-    return card
-
-@router.delete("/{card_id}")
-def delete_card(card_id: int, session: Session = Depends(get_session)):
-    """
-    Delete a card and its related user/study data (UserCard, Reviews).
-
-    Returns:
-        { "ok": true }
-    """
-    card = session.get(Card, card_id)
-    if not card:
-        raise HTTPException(404, "Card not found")
-
-    # Delete dependent rows explicitly (simple cascade).
-    session.exec(delete(Review).where(Review.card_id == card_id))
-    session.exec(delete(UserCard).where(UserCard.card_id == card_id))
-    session.exec(delete(Card).where(Card.id == card_id))
-    session.commit()
-    return {"ok": True}

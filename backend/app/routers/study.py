@@ -1,85 +1,173 @@
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+# app/routers/study.py
+from __future__ import annotations
+
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
+
 from ..db import get_session
 from ..models import UserCard, Card, Review
-from ..crud import next_review_time_for_bin
 
 router = APIRouter(prefix="/study", tags=["study"])
+DEFAULT_USER_ID = 1
 
-def select_next_card(session: Session):
+
+# ---------- Time helpers (timezone-aware UTC) ----------
+def _now_utc() -> datetime:
+    """Return timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
+
+
+def _fallback_delay_for_bin(b: int) -> timedelta:
+    """Reasonable spaced-repetition-ish schedule by bin."""
+    table = {
+        0: timedelta(seconds=0),
+        1: timedelta(seconds=5),
+        2: timedelta(seconds=30),
+        3: timedelta(minutes=5),
+        4: timedelta(minutes=30),
+        5: timedelta(hours=2),
+        6: timedelta(hours=6),
+        7: timedelta(days=1),
+        8: timedelta(days=2),
+        9: timedelta(days=4),
+        10: timedelta(days=7),
+        11: timedelta(days=14),
+    }
+    return table.get(int(b), timedelta(minutes=1))
+
+
+def _next_review_at_from_bin(b: int) -> datetime:
+    """Compute next review time as timezone-aware UTC datetime."""
+    return _now_utc() + _fallback_delay_for_bin(b)
+
+
+# ---------- Selection logic ----------
+def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
     """
-    Select the next card to review based on spaced repetition rules.
+    Select the next card for the default user to study.
 
-    Priority:
-        1. Due cards (bin >= 1) with highest bin first, earliest next_review_at.
-        2. New cards from bin 0.
-        3. None if no cards available.
-
-    Args:
-        session (Session): Database session.
-
-    Returns:
-        Optional[Card]: Next card to review or None if none available.
+    Selection priority:
+      1) Any due active card (next_review_at <= now), preferring:
+         - Higher bin numbers first
+         - Then earliest due time
+         - Then lowest Card.id (stable)
+      2) If no due cards, return the newest "new" card:
+         - bin = 0 and next_review_at IS NULL
+         - Ordered by created_at DESC, then Card.id DESC
     """
-    now = datetime.now(timezone.utc)
+    now = _now_utc()
 
-    row = session.exec(
-        select(UserCard, Card)
-        .join(Card, Card.id == UserCard.card_id)
-        .where(UserCard.status == "active", UserCard.bin >= 1, UserCard.next_review_at <= now)
-        .order_by(UserCard.bin.desc(), UserCard.next_review_at.asc())
+    # 1) due active card(s): prefer higher bin, then earliest due
+    due_stmt = (
+        select(Card, UserCard)
+        .join(UserCard, UserCard.card_id == Card.id)
+        .where(
+            UserCard.user_id == DEFAULT_USER_ID,
+            UserCard.status == "active",
+            UserCard.next_review_at.is_not(None),
+            UserCard.next_review_at <= now,
+        )
+        .order_by(
+            UserCard.bin.desc(),            # prefer higher bin
+            UserCard.next_review_at.asc(),  # then earliest due
+            Card.id.asc(),                  # stable tiebreaker
+        )
         .limit(1)
-    ).first()
-    if row:
-        return row[1]
+    )
+    due_row = session.exec(due_stmt).first()
+    if due_row:
+        return due_row  # (Card, UserCard)
 
-    row = session.exec(
-        select(UserCard, Card)
-        .join(Card, Card.id == UserCard.card_id)
-        .where(UserCard.status == "active", UserCard.bin == 0)
+    # 2) newest "new" bin-0 card (next_review_at is NULL)
+    new_stmt = (
+        select(Card, UserCard)
+        .join(UserCard, UserCard.card_id == Card.id)
+        .where(
+            UserCard.user_id == DEFAULT_USER_ID,
+            UserCard.status == "active",
+            UserCard.bin == 0,
+            UserCard.next_review_at.is_(None),
+        )
+        .order_by(Card.created_at.desc(), Card.id.desc())
         .limit(1)
-    ).first()
-    if row:
-        return row[1]
+    )
+    new_row = session.exec(new_stmt).first()
+    if new_row:
+        return new_row
 
     return None
 
+
+# --- Public function expected by tests ---
+def select_next_card(session: Session) -> Optional[Card]:
+    """Return only the Card (or None) using the same priority as _select_next_card_pair."""
+    pair = _select_next_card_pair(session)
+    return pair[0] if pair else None
+
+
+# ---------- Routes ----------
 @router.get("/next")
-def next_card(session: Session = Depends(get_session)):
+def study_next(session: Session = Depends(get_session)):
     """
-    Retrieve the next card for the study session.
+    Return the next card to study for the default user.
 
-    Args:
-        session (Session): Database session.
-
-    Returns:
-        dict: Status and card data or completion message.
+    - If there are no ACTIVE cards at all -> {"status":"permanently_done"}
+    - Else if there are ACTIVE cards but none due/new -> {"status":"temporarily_done"}
+    - Else -> {"status":"ok", "card": {...}}
     """
-    card = select_next_card(session)
-    if not card:
-        active_left = session.exec(select(UserCard).where(UserCard.status == "active")).first()
-        if not active_left:
-            return {"status": "permanently_done"}
-        return {"status": "temporarily_done"}
-    return {"status": "ok", "card": {"id": card.id, "word": card.word, "definition": card.definition}}
+    # 0) If there are no ACTIVE cards, we are permanently done
+    has_active = session.exec(
+        select(UserCard.id).where(
+            UserCard.user_id == DEFAULT_USER_ID,
+            UserCard.status == "active",
+        )
+    ).first()
+    if has_active is None:
+        return {"status": "permanently_done"}
+
+    # 1) Try to pick a due/new active card
+    pair = _select_next_card_pair(session)
+    if pair:
+        card, uc = pair
+        return {
+            "status": "ok",
+            "card": {
+                "id": card.id,
+                "word": card.word,
+                "definition": card.definition,
+                "bin": uc.bin,
+                "status": uc.status,
+            },
+        }
+
+    # 2) We have active cards but none are due/new right now
+    return {"status": "temporarily_done"}
+
 
 @router.post("/answer")
-def submit_answer(card_id: int, result: str, session: Session = Depends(get_session)):
+def submit_answer(
+    card_id: int = Query(..., description="Card ID to answer"),
+    result: str = Query(..., description="'correct' or 'wrong'"),
+    session: Session = Depends(get_session),
+):
     """
-    Submit an answer for a card and update its spaced repetition state.
-
-    Args:
-        card_id (int): ID of the card being answered.
-        result (str): 'correct' or 'wrong'.
-        session (Session): Database session.
-
-    Returns:
-        dict: Operation result including new bin and status.
+    Accepts query params, e.g.: /study/answer?card_id=1&result=correct
+    Returns: {"ok": True, "to_bin": int, "status": "active|hard_to_remember|never"}
     """
-    uc = session.exec(select(UserCard).where(UserCard.card_id == card_id)).first()
+    if result not in ("correct", "wrong"):
+        raise HTTPException(status_code=422, detail="result must be 'correct' or 'wrong'")
+
+    uc = session.exec(
+        select(UserCard).where(
+            UserCard.card_id == card_id,
+            UserCard.user_id == DEFAULT_USER_ID,
+        )
+    ).first()
     if not uc:
-        raise HTTPException(404, "Card not found")
+        raise HTTPException(status_code=404, detail="Card not found")
 
     from_bin = uc.bin
 
@@ -91,12 +179,22 @@ def submit_answer(card_id: int, result: str, session: Session = Depends(get_sess
         if uc.wrong_count >= 10:
             uc.status = "hard_to_remember"
 
-    uc.next_review_at = next_review_time_for_bin(uc.bin)
+    # Timezone-aware UTC next review
+    uc.next_review_at = _next_review_at_from_bin(uc.bin)
 
     if uc.bin == 11 and uc.status == "active":
         uc.status = "never"
 
-    session.add(Review(card_id=card_id, result=result, from_bin=from_bin, to_bin=uc.bin))
+    session.add(
+        Review(
+            card_id=card_id,
+            user_id=DEFAULT_USER_ID,
+            result=result,
+            from_bin=from_bin,
+            to_bin=uc.bin,
+            created_at=_now_utc(),
+        )
+    )
     session.add(uc)
     session.commit()
 

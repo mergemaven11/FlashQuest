@@ -1,31 +1,79 @@
-from datetime import datetime
-from typing import Optional
+from __future__ import annotations
+from datetime import datetime, timezone
+from typing import Optional, Dict
 from sqlmodel import SQLModel, Field
 
-class Card(SQLModel, table=True):
+
+class CardBase(SQLModel):
+    """Base model for vocabulary flashcards.
+
+    Attributes:
+        word (str): The vocabulary word.
+        definition (str): The word's definition.
     """
-    Represents a vocabulary flashcard.
+    word: str
+    definition: str
+
+
+class CardCreate(CardBase):
+    """Schema for creating a new card.
+
+    Inherits all fields from CardBase.
+    """
+    pass
+
+
+class CardRead(CardBase):
+    """Schema for reading card data.
+
+    Extends CardBase to include:
+        id (int): Primary key.
+        created_at (datetime): When the card was created.
+    """
+    id: int
+    created_at: datetime
+
+class CardAdminRead(SQLModel):
+    """Card plus user-specific admin fields."""
+    id: int
+    word: str
+    definition: str
+    created_at: datetime
+    bin: int
+    status: str
+
+class CardUpdate(SQLModel):
+    """Fields that can be updated on a Card.
+
+    All fields are optional so this schema can be used for partial updates.
+    """
+    word: Optional[str] = None
+    definition: Optional[str] = None
+
+
+class Card(SQLModel, table=True):
+    """Database model representing a vocabulary flashcard.
 
     Attributes:
         id (Optional[int]): Primary key.
         word (str): The vocabulary word.
         definition (str): The word's definition.
-        created_at (datetime): When the card was created.
+        created_at (datetime): When the card was created (UTC).
     """
     id: Optional[int] = Field(default=None, primary_key=True)
     word: str
     definition: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 class UserCard(SQLModel, table=True):
-    """
-    Tracks a specific user's interaction with a flashcard.
+    """Database model tracking a specific user's interaction with a flashcard.
 
     Attributes:
         id (Optional[int]): Primary key.
-        user_id (Optional[int]): User identifier (single-user default in MVP).
+        user_id (Optional[int]): User identifier (defaults to 1 for MVP).
         card_id (int): Associated Card's ID.
-        bin (int): Current spaced repetition bin (0-11).
+        bin (int): Current spaced repetition bin (0–11).
         wrong_count (int): Lifetime incorrect answers for this card.
         next_review_at (Optional[datetime]): Next time the card should be reviewed.
         status (str): 'active', 'hard_to_remember', or 'never'.
@@ -38,9 +86,9 @@ class UserCard(SQLModel, table=True):
     next_review_at: Optional[datetime] = None
     status: str = Field(default="active")
 
+
 class Review(SQLModel, table=True):
-    """
-    Records each review attempt for a flashcard.
+    """Database model recording each review attempt for a flashcard.
 
     Attributes:
         id (Optional[int]): Primary key.
@@ -49,7 +97,7 @@ class Review(SQLModel, table=True):
         result (str): 'correct' or 'wrong'.
         from_bin (int): Bin before the review.
         to_bin (int): Bin after the review.
-        created_at (datetime): When the review took place.
+        created_at (datetime): When the review took place (UTC).
     """
     id: Optional[int] = Field(default=None, primary_key=True)
     card_id: int = Field(foreign_key="card.id")
@@ -57,4 +105,11 @@ class Review(SQLModel, table=True):
     result: str
     from_bin: int
     to_bin: int
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CardStats(SQLModel):
+    total_cards: int
+    active: int
+    never: int
+    hard_to_remember: int
+    by_bin: Dict[int, int]  # keys 0..11
