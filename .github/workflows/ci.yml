@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-test:
@@ -14,6 +15,10 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
 
+    defaults:
+      run:
+        working-directory: backend  # all commands run from backend/
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,28 +27,47 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            requirements.txt
 
-      - name: Install Poetry
-        run: pip install poetry
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
 
       - name: Install dependencies
         run: |
-          poetry install --no-root
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          elif [ -f ../requirements.txt ]; then
+            pip install -r ../requirements.txt
+          else
+            echo "No requirements.txt found"; exit 1
+          fi
+
+      - name: Install dev tools (Ruff, Black, mypy)
+        run: |
+          pip install ruff black mypy
+
+      - name: Show environment (debug)
+        run: |
+          python --version
+          pip list
 
       - name: Run tests
+        env:
+          PYTHONPATH: .
         run: |
-          poetry run pytest --maxfail=1 --disable-warnings -q
+          pytest --maxfail=1 --disable-warnings -q
 
-      # Optional linting step
       - name: Lint with Ruff
         run: |
-          poetry run ruff check .
+          ruff check .
 
       - name: Check formatting with Black
         run: |
-          poetry run black --check .
+          black --check .
 
-      # Optional type checking
       - name: Type check with mypy
         run: |
-          poetry run mypy .
+          mypy .
