@@ -88,6 +88,22 @@ MVP web app implementing **spaced repetition** for vocabulary study.
 > Requires Docker Desktop (Compose v2).  
 > The API URL is baked into the SPA at build time via a build arg.
 
+### Database Migrations (Alembic)
+Inside Docker:
+```bash
+docker compose exec api alembic -c /app/alembic.ini revision --autogenerate -m "desc"
+docker compose exec api alembic -c /app/alembic.ini upgrade head
+docker compose exec api alembic -c /app/alembic.ini current
+```
+
+### 6) Tips for future model changes
+- Make your model change (add nullable column first, if possible).
+- Generate + apply:
+  ```bat
+  docker compose exec api alembic -c /app/alembic.ini revision --autogenerate -m "add <field>"
+  docker compose exec api alembic -c /app/alembic.ini upgrade head
+---
+
 1. **Start everything**
    ```bash
    docker compose up --build

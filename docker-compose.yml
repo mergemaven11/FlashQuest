@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: flashcards
     ports:
-      - "5433:5432"   # <— changed host port
+      - "5433:5432"            # host:container
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -14,6 +14,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   api:
     build: ./backend
@@ -29,17 +30,18 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
 
   web:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: "http://localhost:8080"
+        VITE_API_URL: "http://localhost:8080"   # baked in at build time
     depends_on:
       - api
     ports:
       - "5173:80"
+    restart: unless-stopped
 
 volumes:
   pgdata:
-

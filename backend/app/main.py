@@ -14,14 +14,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def on_startup():
-    """
-    Application startup event.
+# Alembic now owns the schema.
+# @app.on_event("startup")
+# def on_startup():
+#     """
+#     Application startup event.
 
-    Initializes the database schema before the API starts serving requests.
-    """
-    init_db()
+#     Initializes the database schema before the API starts serving requests.
+#     """
+#     init_db()
 
 @app.get("/health")
 def health():
