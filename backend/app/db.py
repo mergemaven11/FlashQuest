@@ -4,6 +4,7 @@ from .config import settings
 # SQLAlchemy/SQLModel database engine
 engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 
+
 def get_session():
     """
     Yield a database session.
@@ -16,6 +17,7 @@ def get_session():
     """
     with Session(engine) as session:
         yield session
+
 
 def init_db():
     """

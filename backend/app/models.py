@@ -11,6 +11,7 @@ class CardBase(SQLModel):
         word (str): The vocabulary word.
         definition (str): The word's definition.
     """
+
     word: str
     definition: str
 
@@ -20,6 +21,7 @@ class CardCreate(CardBase):
 
     Inherits all fields from CardBase.
     """
+
     pass
 
 
@@ -30,11 +32,14 @@ class CardRead(CardBase):
         id (int): Primary key.
         created_at (datetime): When the card was created.
     """
+
     id: int
     created_at: datetime
 
+
 class CardAdminRead(SQLModel):
     """Card plus user-specific admin fields."""
+
     id: int
     word: str
     definition: str
@@ -42,16 +47,18 @@ class CardAdminRead(SQLModel):
     bin: int
     status: str
 
+
 class CardUpdate(SQLModel):
     """Fields that can be updated on a Card.
 
     All fields are optional so this schema can be used for partial updates.
     """
+
     word: Optional[str] = None
     definition: Optional[str] = None
 
 
-class Card(SQLModel, table=True):
+class Card(SQLModel, table=True):  # type: ignore[call-arg]
     """Database model representing a vocabulary flashcard.
 
     Attributes:
@@ -60,13 +67,14 @@ class Card(SQLModel, table=True):
         definition (str): The word's definition.
         created_at (datetime): When the card was created (UTC).
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     word: str
     definition: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class UserCard(SQLModel, table=True):
+class UserCard(SQLModel, table=True):  # type: ignore[call-arg]
     """Database model tracking a specific user's interaction with a flashcard.
 
     Attributes:
@@ -78,6 +86,7 @@ class UserCard(SQLModel, table=True):
         next_review_at (Optional[datetime]): Next time the card should be reviewed.
         status (str): 'active', 'hard_to_remember', or 'never'.
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[int] = Field(default=1, index=True)
     card_id: int = Field(foreign_key="card.id", index=True)
@@ -87,7 +96,7 @@ class UserCard(SQLModel, table=True):
     status: str = Field(default="active")
 
 
-class Review(SQLModel, table=True):
+class Review(SQLModel, table=True):  # type: ignore[call-arg]
     """Database model recording each review attempt for a flashcard.
 
     Attributes:
@@ -99,6 +108,7 @@ class Review(SQLModel, table=True):
         to_bin (int): Bin after the review.
         created_at (datetime): When the review took place (UTC).
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     card_id: int = Field(foreign_key="card.id")
     user_id: Optional[int] = Field(default=1, index=True)
@@ -106,6 +116,7 @@ class Review(SQLModel, table=True):
     from_bin: int
     to_bin: int
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 class CardStats(SQLModel):
     total_cards: int

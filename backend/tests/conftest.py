@@ -48,6 +48,7 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 
+
 # --- Recreate schema for every test to guarantee isolation ---
 @pytest.fixture(autouse=True)
 def _clean_db():
@@ -57,11 +58,13 @@ def _clean_db():
     # Optionally drop again:
     # SQLModel.metadata.drop_all(engine)
 
+
 # --- Provide a single Session per test (shared with the app) ---
 @pytest.fixture()
 def sqlite_session():
     with Session(engine) as session:
         yield session  # session closes on context exit
+
 
 # --- TestClient that uses the SAME session as the sqlite_session fixture ---
 @pytest.fixture()

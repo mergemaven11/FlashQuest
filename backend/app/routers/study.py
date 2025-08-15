@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Any, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
+from sqlalchemy import asc, desc, func, and_
 
 from ..db import get_session
 from ..models import UserCard, Card, Review
@@ -58,7 +59,11 @@ def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
          - bin = 0 and next_review_at IS NULL
          - Ordered by created_at DESC, then Card.id DESC
     """
-    now = _now_utc()
+    # Cast ORM attributes to SQL expressions for mypy
+    nr = cast(Any, UserCard.next_review_at)
+    b = cast(Any, UserCard.bin)
+    cid = cast(Any, Card.id)
+    created = cast(Any, Card.created_at)
 
     # 1) due active card(s): prefer higher bin, then earliest due
     due_stmt = (
@@ -67,13 +72,12 @@ def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
         .where(
             UserCard.user_id == DEFAULT_USER_ID,
             UserCard.status == "active",
-            UserCard.next_review_at.is_not(None),
-            UserCard.next_review_at <= now,
+            and_(nr.is_not(None), nr <= func.now()),
         )
         .order_by(
-            UserCard.bin.desc(),            # prefer higher bin
-            UserCard.next_review_at.asc(),  # then earliest due
-            Card.id.asc(),                  # stable tiebreaker
+            desc(b),  # prefer higher bin
+            asc(nr),  # then earliest due
+            asc(cid),  # stable tiebreaker
         )
         .limit(1)
     )
@@ -89,9 +93,9 @@ def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
             UserCard.user_id == DEFAULT_USER_ID,
             UserCard.status == "active",
             UserCard.bin == 0,
-            UserCard.next_review_at.is_(None),
+            nr.is_(None),
         )
-        .order_by(Card.created_at.desc(), Card.id.desc())
+        .order_by(desc(created), desc(cid))
         .limit(1)
     )
     new_row = session.exec(new_stmt).first()
@@ -158,7 +162,9 @@ def submit_answer(
     Returns: {"ok": True, "to_bin": int, "status": "active|hard_to_remember|never"}
     """
     if result not in ("correct", "wrong"):
-        raise HTTPException(status_code=422, detail="result must be 'correct' or 'wrong'")
+        raise HTTPException(
+            status_code=422, detail="result must be 'correct' or 'wrong'"
+        )
 
     uc = session.exec(
         select(UserCard).where(

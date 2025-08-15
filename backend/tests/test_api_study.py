@@ -5,11 +5,12 @@ from sqlmodel import Session, select
 from app.models import Card, UserCard
 
 
-
 def _mk_card(s: Session, word="alpha", definition="a"):
     """Helper to insert a card + user state."""
     c = Card(word=word, definition=definition)
-    s.add(c); s.commit(); s.refresh(c)
+    s.add(c)
+    s.commit()
+    s.refresh(c)
     s.add(UserCard(card_id=c.id, bin=0))
     s.commit()
     return c
@@ -34,20 +35,26 @@ def test_answer_correct_moves_up_and_sets_timer(client, sqlite_session: Session)
     # Correct answer -> bin 1 (5s)
     r = client.post(f"/study/answer?card_id={c.id}&result=correct")
     payload = r.json()
-    assert payload["ok"] is True and payload["to_bin"] == 1 and payload["status"] == "active"
+    assert (
+        payload["ok"] is True
+        and payload["to_bin"] == 1
+        and payload["status"] == "active"
+    )
 
     # Verify next_review_at is in the future (~5s)
     uc = sqlite_session.exec(
-    select(UserCard).where(UserCard.card_id == c.id)
+        select(UserCard).where(UserCard.card_id == c.id)
     ).first()  # noqa: E701  (fallback for certain SQLModel versions) # type: ignore[attr-defined]
     # Safer re-fetch:
-    uc = sqlite_session.exec(select(UserCard).where(UserCard.card_id == c.id)).first()     # type: ignore[attr-defined]
+    uc = sqlite_session.exec(select(UserCard).where(UserCard.card_id == c.id)).first()  # type: ignore[attr-defined]
     assert uc.bin == 1
     assert uc.next_review_at is not None
     assert uc.next_review_at > datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def test_answer_wrong_resets_bin_and_increments_wrong_count(client, sqlite_session: Session):
+def test_answer_wrong_resets_bin_and_increments_wrong_count(
+    client, sqlite_session: Session
+):
     """Answering 'wrong' should set bin=1 and increment wrong_count."""
     c = _mk_card(sqlite_session, "charlie", "c")
 

@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .db import init_db
 from .routers import cards, study
 
 app = FastAPI(title="Flashcards API - Tobias Scott")
@@ -24,10 +23,12 @@ app.add_middleware(
 #     """
 #     init_db()
 
+
 @app.get("/health")
 def health():
     """Simple healthcheck for Docker healthcheck."""
     return {"ok": True}
+
 
 # Register API routers
 app.include_router(cards.router)

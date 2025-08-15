@@ -4,18 +4,19 @@ from typing import Optional
 # Bin delay mapping in seconds (index 0 unused)
 BIN_INTERVALS = [
     None,  # bin 0 (new card, no delay)
-    5,     # bin 1
-    25,    # bin 2
-    120,   # bin 3
-    600,   # bin 4
+    5,  # bin 1
+    25,  # bin 2
+    120,  # bin 3
+    600,  # bin 4
     3600,  # bin 5
-    18000, # bin 6
-    86400, # bin 7
-    432000, # bin 8
-    2160000, # bin 9
-    10368000, # bin 10 (~4 months)
-    None   # bin 11 (never review)
+    18000,  # bin 6
+    86400,  # bin 7
+    432000,  # bin 8
+    2160000,  # bin 9
+    10368000,  # bin 10 (~4 months)
+    None,  # bin 11 (never review)
 ]
+
 
 def next_review_time_for_bin(bin_: int) -> Optional[datetime]:
     """

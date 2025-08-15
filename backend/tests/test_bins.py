@@ -23,14 +23,21 @@ def test_wrong_10_marks_hard():
     SQLModel.metadata.create_all(engine)
 
     with Session(engine) as s:
-        c = Card(word="abate", definition="to lessen"); s.add(c); s.commit(); s.refresh(c)
+        c = Card(word="abate", definition="to lessen")
+        s.add(c)
+        s.commit()
+        s.refresh(c)
         uc = UserCard(card_id=c.id, bin=1, wrong_count=9, status="active")
-        s.add(uc); s.commit(); s.refresh(uc)
+        s.add(uc)
+        s.commit()
+        s.refresh(uc)
 
         # simulate another wrong
         uc.wrong_count += 1
         if uc.wrong_count >= 10:
             uc.status = "hard_to_remember"
 
-        s.add(uc); s.commit(); s.refresh(uc)
+        s.add(uc)
+        s.commit()
+        s.refresh(uc)
         assert uc.status == "hard_to_remember"

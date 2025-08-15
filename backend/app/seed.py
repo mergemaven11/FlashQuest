@@ -15,6 +15,7 @@ SAMPLE = [
     ("candid", "truthful and straightforward; frank"),
 ]
 
+
 def run() -> None:
     with Session(engine) as s:
         for word, definition in SAMPLE:
@@ -22,10 +23,12 @@ def run() -> None:
             if exists:
                 continue
             card = Card(word=word, definition=definition)
-            s.add(card); s.commit(); s.refresh(card)
+            s.add(card)
+            s.commit()
+            s.refresh(card)
             s.add(UserCard(card_id=card.id, bin=0))
         s.commit()
 
+
 if __name__ == "__main__":
     run()
-

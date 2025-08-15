@@ -1,11 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
+from typing import Any, cast
 from sqlmodel import Session, select
-from sqlalchemy import func 
-from app.models import Card, CardCreate, CardRead, CardAdminRead, CardUpdate, UserCard, CardStats
+from sqlalchemy import func, or_
+from app.models import (
+    Card,
+    CardCreate,
+    CardRead,
+    CardAdminRead,
+    CardUpdate,
+    UserCard,
+    CardStats,
+)
 from app.db import get_session  # adjust import if needed
 
 router = APIRouter()
-DEFAULT_USER_ID = 1  
+DEFAULT_USER_ID = 1
 
 
 @router.post("/cards", response_model=CardRead)
@@ -25,7 +34,9 @@ def create_card(payload: CardCreate, session: Session = Depends(get_session)):
     session.refresh(card)
 
     # Ensure per-user tracking exists so /cards/admin can include bin/status
-    uc = UserCard(user_id=DEFAULT_USER_ID, card_id=card.id)  # defaults: bin=0, status='active'
+    uc = UserCard(
+        user_id=DEFAULT_USER_ID, card_id=card.id
+    )  # defaults: bin=0, status='active'
     session.add(uc)
     session.commit()
 
@@ -46,7 +57,9 @@ def list_cards(session: Session = Depends(get_session)):
 
 
 @router.put("/cards/{card_id}", response_model=CardRead)
-def replace_card(card_id: int, payload: CardUpdate, session: Session = Depends(get_session)):
+def replace_card(
+    card_id: int, payload: CardUpdate, session: Session = Depends(get_session)
+):
     """PUT: accept partial fields (acts like an upsert-style replace for this API)."""
     card = session.get(Card, card_id)
     if not card:
@@ -59,8 +72,11 @@ def replace_card(card_id: int, payload: CardUpdate, session: Session = Depends(g
     session.refresh(card)
     return card
 
+
 @router.patch("/cards/{card_id}", response_model=CardRead)
-def update_card(card_id: int, payload: CardUpdate, session: Session = Depends(get_session)):
+def update_card(
+    card_id: int, payload: CardUpdate, session: Session = Depends(get_session)
+):
     """PATCH: partial update; only provided fields are changed."""
     card = session.get(Card, card_id)
     if not card:
@@ -95,6 +111,7 @@ def delete_card(card_id: int, session: Session = Depends(get_session)):
     session.commit()
     return {"ok": True}
 
+
 @router.get("/cards/admin", response_model=list[CardAdminRead])
 def list_cards_admin(q: str | None = None, session: Session = Depends(get_session)):
     """
@@ -109,10 +126,10 @@ def list_cards_admin(q: str | None = None, session: Session = Depends(get_sessio
     )
 
     if q:
-        like_pattern = f"%{q}%"
-        stmt = stmt.where(
-            (Card.word.ilike(like_pattern)) | (Card.definition.ilike(like_pattern))
-        )
+        like = f"%{q.lower()}%"
+        word_col = cast(Any, Card.word)
+        def_col = cast(Any, Card.definition)
+        stmt = stmt.where(or_(word_col.ilike(like), def_col.ilike(like)))
 
     rows = session.exec(stmt).all()
 
@@ -128,6 +145,7 @@ def list_cards_admin(q: str | None = None, session: Session = Depends(get_sessio
         for card, uc in rows
     ]
 
+
 @router.get("/cards/stats", response_model=CardStats)
 def card_stats(session: Session = Depends(get_session)):
     """
@@ -138,7 +156,9 @@ def card_stats(session: Session = Depends(get_session)):
     """
     # total cards traced for this user
     total_cards = session.exec(
-        select(func.count()).select_from(UserCard).where(UserCard.user_id == DEFAULT_USER_ID)
+        select(func.count())
+        .select_from(UserCard)
+        .where(UserCard.user_id == DEFAULT_USER_ID)
     ).one()
 
     # counts by status

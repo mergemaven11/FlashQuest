@@ -1,7 +1,6 @@
 """Admin endpoint tests: create/list/search/update/delete and stats."""
 
 from sqlmodel import Session
-from app.models import Card, UserCard
 
 
 def test_admin_create_list_update_delete(client, sqlite_session: Session):
@@ -43,6 +42,7 @@ def test_admin_search_and_stats(client, sqlite_session: Session):
     # stats
     r = client.get("/cards/stats")
     stats = r.json()
-    assert {"total_cards", "active", "never", "hard_to_remember", "by_bin"} <= set(stats.keys())
+    assert {"total_cards", "active", "never", "hard_to_remember", "by_bin"} <= set(
+        stats.keys()
+    )
     assert set(map(int, stats["by_bin"].keys())) == set(range(12))
-

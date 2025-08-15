@@ -28,13 +28,22 @@ def test_prefers_higher_bin_due():
     now = datetime.now(timezone.utc)
 
     with Session(engine) as s:
-        c1 = Card(word="alpha", definition="a"); s.add(c1); s.commit(); s.refresh(c1)
+        c1 = Card(word="alpha", definition="a")
+        s.add(c1)
+        s.commit()
+        s.refresh(c1)
         s.add(UserCard(card_id=c1.id, bin=2, next_review_at=now - timedelta(seconds=1)))
 
-        c2 = Card(word="bravo", definition="b"); s.add(c2); s.commit(); s.refresh(c2)
+        c2 = Card(word="bravo", definition="b")
+        s.add(c2)
+        s.commit()
+        s.refresh(c2)
         s.add(UserCard(card_id=c2.id, bin=3, next_review_at=now - timedelta(seconds=1)))
 
-        c3 = Card(word="charlie", definition="c"); s.add(c3); s.commit(); s.refresh(c3)
+        c3 = Card(word="charlie", definition="c")
+        s.add(c3)
+        s.commit()
+        s.refresh(c3)
         s.add(UserCard(card_id=c3.id, bin=0))
 
         s.commit()
