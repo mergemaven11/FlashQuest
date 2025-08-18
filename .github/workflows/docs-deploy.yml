@@ -27,11 +27,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Configure Pages (recommended)
-      - name: Setup Pages
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      # --- Frontend: TypeDoc -> Markdown into docs/frontend ---
+      # ---- Build frontend docs (TypeDoc -> docs/frontend) ----
       - name: Use Node
         uses: actions/setup-node@v4
         with:
@@ -45,7 +44,7 @@ jobs:
           npm ci
           npm run docs
 
-      # --- Backend: mkdocs + mkdocstrings ---
+      # ---- Build MkDocs site (outputs to ./site) ----
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -60,15 +59,14 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build --strict
 
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./site
+          path: site
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Deploy to GitHub Pages
-        id: deployment
         uses: actions/deploy-pages@v4
