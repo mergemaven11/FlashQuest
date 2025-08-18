@@ -1,0 +1,19 @@
+# netlify.toml (repo root)
+
+[build]
+  publish = "site"
+  command = """
+  python -m pip install --upgrade pip &&
+  pip install mkdocs mkdocs-material "mkdocstrings[python]" &&
+  pip install -r backend/requirements.txt &&
+  cd frontend && npm ci && npm run docs && cd .. &&
+  mkdocs build --strict
+  """
+
+[build.environment]
+  PYTHON_VERSION = "3.12"
+  NODE_VERSION   = "20"
+
+# Optional: skip builds if only non-docs files changed (tweak as you like)
+[build]
+  ignore = "git diff --quiet HEAD^ HEAD -- mkdocs.yml docs/ frontend/ backend/ .github/workflows/ || exit 1"
