@@ -28,26 +28,22 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: |
-            backend/requirements.txt
-            requirements.txt
+          cache-dependency-path: backend/requirements.txt
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install dependencies
+      - name: Install project dependencies
         run: |
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
-          elif [ -f ../requirements.txt ]; then
-            pip install -r ../requirements.txt
           else
-            echo "No requirements.txt found"; exit 1
+            echo "backend/requirements.txt not found"; exit 1
           fi
 
-      - name: Install dev tools (Ruff, Black)
+      - name: Install dev/test tools
         run: |
-          pip install ruff black
+          pip install pytest ruff black
 
       - name: Show environment (debug)
         run: |
@@ -57,13 +53,10 @@ jobs:
       - name: Run tests
         env:
           PYTHONPATH: .
-        run: |
-          pytest --maxfail=1 --disable-warnings -q
+        run: pytest --maxfail=1 --disable-warnings -q
 
       - name: Lint with Ruff
-        run: |
-          ruff check .
+        run: ruff check .
 
       - name: Check formatting with Black
-        run: |
-          black --check .
+        run: black --check .
