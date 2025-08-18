@@ -21,28 +21,32 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _fallback_delay_for_bin(b: int) -> timedelta:
-    """Reasonable spaced-repetition-ish schedule by bin."""
-    table = {
-        0: timedelta(seconds=0),
-        1: timedelta(seconds=5),
-        2: timedelta(seconds=30),
-        3: timedelta(minutes=5),
-        4: timedelta(minutes=30),
-        5: timedelta(hours=2),
-        6: timedelta(hours=6),
-        7: timedelta(days=1),
-        8: timedelta(days=2),
-        9: timedelta(days=4),
-        10: timedelta(days=7),
-        11: timedelta(days=14),
-    }
-    return table.get(int(b), timedelta(minutes=1))
+# Spec-accurate bin delays (bins 1–11); bin 11 = never
+BIN_DELAYS: dict[int, Optional[timedelta]] = {
+    0: timedelta(seconds=0),  # new
+    1: timedelta(seconds=5),
+    2: timedelta(seconds=25),
+    3: timedelta(minutes=2),
+    4: timedelta(minutes=10),
+    5: timedelta(hours=1),
+    6: timedelta(hours=5),
+    7: timedelta(days=1),
+    8: timedelta(days=5),
+    9: timedelta(days=25),
+    10: timedelta(days=120),  # ~4 months
+    11: None,  # never
+}
 
 
-def _next_review_at_from_bin(b: int) -> datetime:
-    """Compute next review time as timezone-aware UTC datetime."""
-    return _now_utc() + _fallback_delay_for_bin(b)
+def _fallback_delay_for_bin(b: int) -> Optional[timedelta]:
+    """Return the spec delay for a bin; None means 'never'."""
+    return BIN_DELAYS.get(int(b), timedelta(minutes=1))
+
+
+def _next_review_at_from_bin(b: int) -> Optional[datetime]:
+    """Compute next review time as timezone-aware UTC; None for 'never'."""
+    delay = _fallback_delay_for_bin(b)
+    return None if delay is None else _now_utc() + delay
 
 
 # ---------- Selection logic ----------
@@ -159,8 +163,14 @@ def submit_answer(
     session: Session = Depends(get_session),
 ):
     """
-    Accepts query params, e.g.: /study/answer?card_id=1&result=correct
-    Returns: {"ok": True, "to_bin": int, "status": "active|hard_to_remember|never"}
+    Accept an answer and update spaced-repetition state.
+
+    Query Args:
+        card_id: Card to answer.
+        result: 'correct' or 'wrong'.
+
+    Returns:
+        {"ok": True, "to_bin": int, "status": "active|hard_to_remember|never"}
     """
     if result not in ("correct", "wrong"):
         raise HTTPException(
@@ -186,11 +196,13 @@ def submit_answer(
         if uc.wrong_count >= 10:
             uc.status = "hard_to_remember"
 
-    # Timezone-aware UTC next review
+    # Compute next review time per spec (bin 11 => never/None)
     uc.next_review_at = _next_review_at_from_bin(uc.bin)
 
-    if uc.bin == 11 and uc.status == "active":
+    # If card reached bin 11, mark never and clear next review (per spec)
+    if uc.bin == 11:
         uc.status = "never"
+        uc.next_review_at = None
 
     session.add(
         Review(

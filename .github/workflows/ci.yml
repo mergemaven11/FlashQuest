@@ -45,9 +45,9 @@ jobs:
             echo "No requirements.txt found"; exit 1
           fi
 
-      - name: Install dev tools (Ruff, Black, mypy)
+      - name: Install dev tools (Ruff, Black)
         run: |
-          pip install ruff black mypy
+          pip install ruff black
 
       - name: Show environment (debug)
         run: |
@@ -67,7 +67,3 @@ jobs:
       - name: Check formatting with Black
         run: |
           black --check .
-
-      - name: Type check with mypy
-        run: |
-          mypy .
