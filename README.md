@@ -5,7 +5,9 @@ MVP web app implementing **spaced repetition** for vocabulary study.
 
 > **Repo name:** `hiring-[firstname]-[lastname]-flashcards` (private)
 
-**Docs:** flashcards-docs.netlify.app
+[![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://flashcards-docs.netlify.app/)
+[Docs](https://flashcards-docs.netlify.app/ "Open the documentation")
+
 
 ---
 ![CI](https://github.com/mergemaven11/hiring-tobias-scott-flashcards/actions/workflows/ci.yml/badge.svg)
