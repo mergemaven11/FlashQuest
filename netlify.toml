@@ -9,11 +9,10 @@
   cd frontend && npm ci && npm run docs && cd .. &&
   mkdocs build --strict
   """
+  # Skip Netlify build if the commit doesn't touch docs-relevant paths.
+  # Uses Netlify's $CACHED_COMMIT_REF when available; falls back to previous commit.
+  ignore = "git diff --quiet ${CACHED_COMMIT_REF:-HEAD~1} $COMMIT_REF -- mkdocs.yml docs/ frontend/ backend/ .github/workflows/ || exit 1"
 
 [build.environment]
   PYTHON_VERSION = "3.12"
   NODE_VERSION   = "20"
-
-# Optional: skip builds if only non-docs files changed (tweak as you like)
-[build]
-  ignore = "git diff --quiet HEAD^ HEAD -- mkdocs.yml docs/ frontend/ backend/ .github/workflows/ || exit 1"
