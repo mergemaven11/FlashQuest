@@ -3,14 +3,16 @@
 [build]
   publish = "site"
   command = """
-  python -m pip install --upgrade pip &&
-  pip install mkdocs mkdocs-material "mkdocstrings[python]" &&
-  pip install -r backend/requirements.txt &&
-  cd frontend && npm ci && npm run docs && cd .. &&
-  mkdocs build --strict
+  set -e
+  python -m venv .venv
+  . .venv/bin/activate
+  python -m pip install --upgrade pip
+  pip install mkdocs mkdocs-material "mkdocstrings[python]"
+  pip install -r backend/requirements.txt
+  cd frontend && npm ci && npm run docs && cd ..
+  python -m mkdocs build --strict
   """
-  # Skip Netlify build if the commit doesn't touch docs-relevant paths.
-  # Uses Netlify's $CACHED_COMMIT_REF when available; falls back to previous commit.
+  # Optional: skip builds if docs-relevant paths didn't change
   ignore = "git diff --quiet ${CACHED_COMMIT_REF:-HEAD~1} $COMMIT_REF -- mkdocs.yml docs/ frontend/ backend/ .github/workflows/ || exit 1"
 
 [build.environment]
