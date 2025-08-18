@@ -3,6 +3,12 @@ name: Docs – Build & Deploy (MkDocs → GitHub Pages)
 on:
   push:
     branches: [ main ]
+    paths:
+      - "mkdocs.yml"
+      - "docs/**"
+      - "frontend/**"
+      - "backend/**"
+      - ".github/workflows/docs-deploy.yml"
   workflow_dispatch:
 
 permissions:
@@ -23,7 +29,7 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:
-          enablement: true   # allow auto-creation/enabling of the Pages site
+          enablement: true  # lets the action enable Pages if allowed by repo/org
 
       # Build frontend docs (TypeDoc -> docs/frontend)
       - uses: actions/setup-node@v4
