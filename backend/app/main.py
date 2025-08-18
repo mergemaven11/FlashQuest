@@ -1,35 +1,48 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from .routers import cards, study
+from .config import settings
 
-app = FastAPI(title="Flashcards API - Tobias Scott")
 
-# Enable CORS for all origins (SPA compatibility)
+def _allowed_origins() -> list[str]:
+    """
+    Build the list of allowed CORS origins.
+
+    Returns:
+        list[str]: Origins permitted to access this API from the browser.
+
+    Notes:
+        - Includes localhost dev ports by default.
+        - You can extend via `ALLOWED_ORIGINS` env (comma-separated or JSON list).
+    """
+    # Default for local dev
+    defaults = {"http://localhost:5173", "http://127.0.0.1:5173"}
+    # If added ALLOWED_ORIGINS to Settings, merge it here; otherwise just return defaults.
+    try:
+        extra = set(getattr(settings, "ALLOWED_ORIGINS", []) or [])
+    except Exception:
+        extra = set()
+    return list(defaults | extra)
+
+
+app = FastAPI(title="Flashcards API")
+
+# ---- CORS middleware ----
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Alembic now owns the schema.
-# @app.on_event("startup")
-# def on_startup():
-#     """
-#     Application startup event.
-
-#     Initializes the database schema before the API starts serving requests.
-#     """
-#     init_db()
+# ---- Routers ----
+app.include_router(cards.router)
+app.include_router(study.router)
 
 
 @app.get("/health")
-def health():
-    """Simple healthcheck for Docker healthcheck."""
+def health() -> dict[str, bool]:
+    """Simple health check endpoint."""
     return {"ok": True}
-
-
-# Register API routers
-app.include_router(cards.router)
-app.include_router(study.router)

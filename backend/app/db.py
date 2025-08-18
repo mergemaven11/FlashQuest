@@ -1,31 +1,31 @@
-from sqlmodel import SQLModel, create_engine, Session
+"""Database session and initialization utilities."""
+
+from __future__ import annotations
+
+from typing import Iterator
+
+from sqlmodel import create_engine, Session
+
 from .config import settings
 
-# SQLAlchemy/SQLModel database engine
 engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 
 
-def get_session():
-    """
-    Yield a database session.
+def init_db() -> None:
+    """Initialize core database state.
 
-    Intended to be used as a FastAPI dependency in route handlers so that
-    each request has its own database session context.
+    This function is intentionally minimal because we manage schema via Alembic.
+    Keep this around for one-time bootstrap tasks if needed later (e.g., seeds).
+    """
+    # Alembic handles schema creation/migrations. Nothing to do here.
+    return None
+
+
+def get_session() -> Iterator[Session]:
+    """FastAPI dependency that yields a SQLModel `Session`.
 
     Yields:
-        Session: An active SQLModel/SQLAlchemy session.
+        Session: An open database session tied to the current request.
     """
     with Session(engine) as session:
         yield session
-
-
-def init_db():
-    """
-    Initialize the database schema.
-
-    Creates all tables defined in SQLModel metadata if they do not exist.
-
-    Returns:
-        None
-    """
-    SQLModel.metadata.create_all(engine)

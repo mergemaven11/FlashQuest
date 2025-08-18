@@ -1,4 +1,17 @@
 # backend/alembic/env.py
+
+"""Alembic environment configuration.
+
+This script configures Alembic to:
+- Read the DATABASE_URL from app settings
+- Target SQLModel metadata for autogenerate
+- Run migrations in offline/online modes
+- Play nicely with `mypy` by guarding Alembic runtime imports
+
+It also ensures the URL is injected into alembic.ini at runtime so
+`alembic -c /app/alembic.ini upgrade head` works inside Docker.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
