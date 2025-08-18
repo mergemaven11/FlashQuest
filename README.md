@@ -1,6 +1,6 @@
 # Hiring Flashcards
 
-MVP web app implementing **spaced repetition** for vocabulary study.  
+MVP web app implementing **spaced repetition** for vocabulary study.
 **React (Vite) SPA** + **FastAPI** API + **PostgreSQL**, packaged with **Docker Compose** for easy run.
 
 > **Repo name:** `hiring-[firstname]-[lastname]-flashcards` (private)
@@ -90,7 +90,7 @@ MVP web app implementing **spaced repetition** for vocabulary study.
 
 ## Run Locally (Docker)
 
-> Requires Docker Desktop (Compose v2).  
+> Requires Docker Desktop (Compose v2).
 > The API URL is baked into the SPA at build time via a build arg.
 
 ### Database Migrations (Alembic)
@@ -113,7 +113,7 @@ docker compose exec api alembic -c /app/alembic.ini current
    ```bash
    docker compose up --build
    ```
-   - API docs: http://localhost:8080/docs  
+   - API docs: http://localhost:8080/docs
    - Web app:  http://localhost:5173
 
 2. **Seed a few cards (one-off)**
@@ -171,12 +171,12 @@ Base URL: `http://localhost:8080`
   { "word": "abate", "definition": "to become less intense or widespread" }
   ```
 - `GET /cards` → list cards (basic)
-- `GET /cards/admin` → list cards with status  
+- `GET /cards/admin` → list cards with status
   Returns: `{ id, word, definition, bin, wrong_count, next_review_at, status }[]`
-- `GET /study/next` →  
-  - `{ "status": "ok", "card": { ... } }` or  
+- `GET /study/next` →
+  - `{ "status": "ok", "card": { ... } }` or
   - `{ "status": "temporarily_done" }` or `{ "status": "permanently_done" }`
-- `POST /study/answer?card_id=ID&result=correct|wrong` → updates bins/timers  
+- `POST /study/answer?card_id=ID&result=correct|wrong` → updates bins/timers
   Returns: `{ "ok": true, "to_bin": number, "status": "active|never|hard_to_remember" }`
 
 OpenAPI docs at **/docs**.

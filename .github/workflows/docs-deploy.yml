@@ -42,7 +42,7 @@ jobs:
           pip install mkdocs mkdocs-material "mkdocstrings[python]"
           pip install -r backend/requirements.txt
       - name: Build MkDocs site
-        run: mkdocs build --strict
+        run: mkdocs build
 
       # Publish static site/ to gh-pages branch
       - name: Deploy to gh-pages

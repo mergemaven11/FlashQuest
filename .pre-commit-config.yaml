@@ -1,11 +1,35 @@
+default_language_version:
+  python: python3.12
+
+exclude: |
+  (?x)^(
+    frontend/|
+    docs/|
+    site/|
+    node_modules/|
+    \.git/|
+    \.venv/|
+    backend/alembic/versions/
+  )
+
 repos:
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.6.9  # Use the latest version from ruff releases
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
     hooks:
       - id: ruff
-        args: ["--fix"]
+        args: ["--fix", "--unsafe-fixes"]
+        files: ^backend/.*\.py$
 
   - repo: https://github.com/psf/black
-    rev: 24.8.0  # Check PyPI for the latest
+    rev: 24.8.0
     hooks:
       - id: black
+        files: ^backend/.*\.py$
+
+  # (optional, but nice)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict

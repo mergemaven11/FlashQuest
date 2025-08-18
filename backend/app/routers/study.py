@@ -119,7 +119,7 @@ def select_next_card(session: Session) -> Optional[Card]:
 
 # ---------- Routes ----------
 @router.get("/next")
-def study_next(session: Session = Depends(get_session)):
+def study_next(session: Session = Depends(get_session)) -> dict[str, Any]:
     """
     Return the next card to study for the default user.
 
@@ -161,7 +161,7 @@ def submit_answer(
     card_id: int = Query(..., description="Card ID to answer"),
     result: str = Query(..., description="'correct' or 'wrong'"),
     session: Session = Depends(get_session),
-):
+) -> dict[str, Any]:
     """
     Accept an answer and update spaced-repetition state.
 
