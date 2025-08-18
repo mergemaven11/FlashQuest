@@ -5,8 +5,12 @@ MVP web app implementing **spaced repetition** for vocabulary study.
 
 > **Repo name:** `hiring-[firstname]-[lastname]-flashcards` (private)
 
+**Docs:** https://mergemaven11.github.io/hiring-tobias-scott-flashcards/
+
 ---
 ![CI](https://github.com/mergemaven11/hiring-tobias-scott-flashcards/actions/workflows/ci.yml/badge.svg)
+[![Docs Deploy](https://github.com/mergemaven11/hiring-tobias-scott-flashcards/actions/workflows/docs-deploy.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/docs-deploy.yml)
+
 
 ## Overview
 

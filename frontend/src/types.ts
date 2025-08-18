@@ -1,22 +1,43 @@
-/** A vocabulary card with its text content. */
-export type Card = {
+/**
+ * Shared DTOs that mirror the backend responses.
+ * Keep these in sync with FastAPI response models.
+ */
+
+/** ISO8601 date string (e.g., "2025-08-18T12:34:56Z"). */
+export type ISODate = string;
+
+/** Read-only card view returned by API. */
+export interface CardRead {
   id: number;
   word: string;
   definition: string;
-};
+  created_at: ISODate;
+}
 
-/** Admin listing model with status fields. */
-export type AdminCard = Card & {
+/** Admin view extends CardRead with study state. */
+export interface CardAdminRead extends CardRead {
   bin: number;
-  wrong_count: number;
-  next_review_at: string | null;
-  status: "active" | "never" | "hard_to_remember";
+  status: "active" | "never" | "hard_to_remember" | string;
+}
+
+/** Study-next response variants (discriminated by `status`). */
+export type StudyNextOK = {
+  status: "ok";
+  card: {
+    id: number;
+    word: string;
+    definition: string;
+    bin: number;
+    status: "active" | "never" | "hard_to_remember" | string;
+  };
 };
+export type StudyNextTemporary = { status: "temporarily_done" };
+export type StudyNextPermanent = { status: "permanently_done" };
+export type StudyNext = StudyNextOK | StudyNextTemporary | StudyNextPermanent;
 
-/** API response when requesting the next card to study. */
-export type NextResponse =
-  | { status: "ok"; card: Card }
-  | { status: "temporarily_done" | "permanently_done" };
+/** Payload for creating a new card. */
+export interface CreateCardPayload {
+  word: string;
+  definition: string;
+}
 
-/** Result options sent to the API after a user answers. */
-export type AnswerResult = "correct" | "wrong";

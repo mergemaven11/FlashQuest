@@ -1,0 +1,12 @@
+{
+  "tsconfig": "tsconfig.app.json",
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "plugin": ["typedoc-plugin-markdown"],
+  "theme": "markdown",
+  "hideBreadcrumbs": true,
+  "out": "../docs/frontend",
+  "excludeNotDocumented": true,
+  "excludePrivate": true,
+  "excludeProtected": true
+}
