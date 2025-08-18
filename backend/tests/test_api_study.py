@@ -1,4 +1,13 @@
-"""Endpoint tests for study flow: /study/next and /study/answer."""
+# Here’s the updated **`tests/test_api_study.py`** with a helper that normalizes datetimes to **aware UTC** before comparison,
+# plus clear docstrings/comments:
+
+
+"""Endpoint tests for study flow: /study/next and /study/answer.
+
+These tests exercise the selection logic (next card) and the bin/spacing updates
+when answering correct or wrong. SQLite may strip tzinfo on datetime columns, so
+we normalize DB datetimes to *aware UTC* before comparing to `datetime.now(UTC)`.
+"""
 
 from __future__ import annotations
 
@@ -11,8 +20,32 @@ from sqlmodel import Session, select
 from app.models import Card, UserCard
 
 
+def _as_aware_utc(dt: datetime) -> datetime:
+    """Normalize a datetime to timezone-aware UTC.
+
+    Args:
+        dt: A datetime that may be naive (no tzinfo) or offset-aware.
+
+    Returns:
+        datetime: A timezone-aware UTC datetime suitable for comparisons.
+    """
+    if dt.tzinfo is None:
+        # SQLite often returns naive datetimes; assume they are UTC in tests.
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _mk_card(s: Session, word: str = "alpha", definition: str = "a") -> Card:
-    """Helper to insert a card + user state."""
+    """Insert a Card and its initial UserCard row (bin 0).
+
+    Args:
+        s: Open SQLModel session.
+        word: The vocabulary word.
+        definition: The word's definition.
+
+    Returns:
+        The created Card (refreshed with its ID).
+    """
     c = Card(word=word, definition=definition)
     s.add(c)
     s.commit()
@@ -57,8 +90,9 @@ def test_answer_correct_moves_up_and_sets_timer(
     assert uc is not None
     assert uc.bin == 1
     assert uc.next_review_at is not None
-    # Compare aware datetimes
-    assert uc.next_review_at > datetime.now(timezone.utc)
+
+    # Normalize possible naive DB datetime to aware UTC before comparing
+    assert _as_aware_utc(uc.next_review_at) > datetime.now(timezone.utc)
 
 
 def test_answer_wrong_resets_bin_and_increments_wrong_count(
