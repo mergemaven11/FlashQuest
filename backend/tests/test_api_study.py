@@ -1,11 +1,17 @@
 """Endpoint tests for study flow: /study/next and /study/answer."""
 
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
+
+from fastapi.testclient import TestClient
 from sqlmodel import Session, select
+
 from app.models import Card, UserCard
 
 
-def _mk_card(s: Session, word="alpha", definition="a"):
+def _mk_card(s: Session, word: str = "alpha", definition: str = "a") -> Card:
     """Helper to insert a card + user state."""
     c = Card(word=word, definition=definition)
     s.add(c)
@@ -16,7 +22,9 @@ def _mk_card(s: Session, word="alpha", definition="a"):
     return c
 
 
-def test_next_returns_new_when_nothing_due(client, sqlite_session: Session):
+def test_next_returns_new_when_nothing_due(
+    client: TestClient, sqlite_session: Session
+) -> None:
     """When no due cards exist, /study/next should return a bin-0 card."""
     _mk_card(sqlite_session, "alpha", "a")
     r = client.get("/study/next")
@@ -25,7 +33,9 @@ def test_next_returns_new_when_nothing_due(client, sqlite_session: Session):
     assert data["card"]["word"] == "alpha"
 
 
-def test_answer_correct_moves_up_and_sets_timer(client, sqlite_session: Session):
+def test_answer_correct_moves_up_and_sets_timer(
+    client: TestClient, sqlite_session: Session
+) -> None:
     """Answering 'correct' should increase bin and set a positive next_review_at."""
     c = _mk_card(sqlite_session, "bravo", "b")
 
@@ -42,44 +52,35 @@ def test_answer_correct_moves_up_and_sets_timer(client, sqlite_session: Session)
     )
 
     # Verify next_review_at is in the future (~5s)
-    uc = sqlite_session.exec(
-        select(UserCard).where(UserCard.card_id == c.id)
-    ).first()  # noqa: E701  (fallback for certain SQLModel versions) # type: ignore[attr-defined]
-    # Safer re-fetch:
-    uc = sqlite_session.exec(select(UserCard).where(UserCard.card_id == c.id)).first()  # type: ignore[attr-defined]
+    uc_stmt = select(UserCard).where(cast(Any, UserCard.card_id) == c.id)
+    uc = sqlite_session.exec(uc_stmt).first()
+    assert uc is not None
     assert uc.bin == 1
     assert uc.next_review_at is not None
-    assert uc.next_review_at > datetime.now(timezone.utc).replace(tzinfo=None)
+    # Compare aware datetimes
+    assert uc.next_review_at > datetime.now(timezone.utc)
 
 
 def test_answer_wrong_resets_bin_and_increments_wrong_count(
-    client, sqlite_session: Session
-):
+    client: TestClient, sqlite_session: Session
+) -> None:
     """Answering 'wrong' should set bin=1 and increment wrong_count."""
     c = _mk_card(sqlite_session, "charlie", "c")
 
-    # Fetch the actual UserCard instance (not a ScalarResult)
-    uc = sqlite_session.exec(
-        select(UserCard).where(UserCard.card_id == c.id)  # type: ignore[attr-defined]
-    ).first()
+    # Fetch the actual UserCard instance
+    uc_stmt = select(UserCard).where(cast(Any, UserCard.card_id) == c.id)
+    uc = sqlite_session.exec(uc_stmt).first()
     assert uc is not None
 
     # Make it due in a higher bin to simulate real flow
     uc.bin = 3
-
-    # If your model stores AWARE UTC datetimes:
     uc.next_review_at = datetime.now(timezone.utc) - timedelta(seconds=1)
-
-    # If your model stores NAIVE datetimes, use this instead:
-    # uc.next_review_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(seconds=1)
-
     sqlite_session.add(uc)
     sqlite_session.commit()
 
     # Wrong answer
     before = uc.wrong_count
-    r = client.post(f"/study/answer?card_id={c.id}&result=wrong")
-    payload = r.json()
+    payload = client.post(f"/study/answer?card_id={c.id}&result=wrong").json()
     assert payload["ok"] is True and payload["to_bin"] == 1
 
     sqlite_session.refresh(uc)

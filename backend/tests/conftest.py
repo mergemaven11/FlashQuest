@@ -1,8 +1,11 @@
 # tests/conftest.py
 """Pytest fixtures for an in-memory FastAPI test app with SQLite."""
+from __future__ import annotations
+
 import sys
-from pathlib import Path
 import importlib
+from pathlib import Path
+from typing import Callable, Any, Optional, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,27 +21,27 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.main import app  # noqa: E402
 
 # --- Find the get_session dependency your routes use ---
-_get_session = None
-for modname in [
+_get_session_func: Optional[Callable[..., Any]] = None
+for modname in (
     "app.dependencies",
     "app.database",
     "app.db",
     "app.core.db",
     "app.db.session",
-]:
+):
     try:
         mod = importlib.import_module(modname)
-        if hasattr(mod, "get_session"):
-            _get_session = getattr(mod, "get_session")
-            break
     except ModuleNotFoundError:
         continue
+    if hasattr(mod, "get_session"):
+        _get_session_func = cast(Callable[..., Any], getattr(mod, "get_session"))
+        break
 
-if _get_session is None:
+if _get_session_func is None:
     raise ImportError(
         "Could not find a `get_session` function. "
-        "Add it to one of: app/dependencies.py, app/database.py, app/db.py "
-        "or update tests/conftest.py to import it from the right place."
+        "Add it to one of: app/dependencies.py, app/database.py, app/db.py, "
+        "app/core/db.py, or app/db/session.py; or update tests/conftest.py."
     )
 
 # --- Thread-safe in-memory SQLite for tests (single shared connection) ---
@@ -51,7 +54,7 @@ engine = create_engine(
 
 # --- Recreate schema for every test to guarantee isolation ---
 @pytest.fixture(autouse=True)
-def _clean_db():
+def _clean_db() -> None:
     SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
     yield
@@ -61,7 +64,7 @@ def _clean_db():
 
 # --- Provide a single Session per test (shared with the app) ---
 @pytest.fixture()
-def sqlite_session():
+def sqlite_session() -> Session:
     with Session(engine) as session:
         yield session  # session closes on context exit
 
@@ -70,10 +73,12 @@ def sqlite_session():
 @pytest.fixture()
 def client(sqlite_session: Session):
     def _override_get_session():
-        # Yield the *same* session instance so API and test see the same state
+        # Yield the *same* session instance so API and test share state
         yield sqlite_session
 
-    app.dependency_overrides[_get_session] = _override_get_session
+    # mypy-friendly: ensure the dict key is a Callable
+    key: Callable[..., Any] = cast(Callable[..., Any], _get_session_func)
+    app.dependency_overrides[key] = _override_get_session
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

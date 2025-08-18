@@ -64,11 +64,12 @@ def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
     b = cast(Any, UserCard.bin)
     cid = cast(Any, Card.id)
     created = cast(Any, Card.created_at)
+    uc_card_id = cast(Any, UserCard.card_id)
 
     # 1) due active card(s): prefer higher bin, then earliest due
     due_stmt = (
         select(Card, UserCard)
-        .join(UserCard, UserCard.card_id == Card.id)
+        .join(UserCard, uc_card_id == cid)  # casted ON clause
         .where(
             UserCard.user_id == DEFAULT_USER_ID,
             UserCard.status == "active",
@@ -88,11 +89,11 @@ def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
     # 2) newest "new" bin-0 card (next_review_at is NULL)
     new_stmt = (
         select(Card, UserCard)
-        .join(UserCard, UserCard.card_id == Card.id)
+        .join(UserCard, uc_card_id == cid)  # casted ON clause
         .where(
             UserCard.user_id == DEFAULT_USER_ID,
             UserCard.status == "active",
-            UserCard.bin == 0,
+            cast(Any, UserCard.bin) == 0,  # cast to avoid bool typing
             nr.is_(None),
         )
         .order_by(desc(created), desc(cid))
