@@ -1,4 +1,4 @@
-name: Docs – Build & Deploy (MkDocs → GitHub Pages)
+name: Docs – Build & Publish to gh-pages
 
 on:
   push:
@@ -12,26 +12,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  contents: write   # required to push to gh-pages
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true  # lets the action enable Pages if allowed by repo/org
-
-      # Build frontend docs (TypeDoc -> docs/frontend)
+      # Frontend docs
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -43,7 +32,7 @@ jobs:
           npm ci
           npm run docs
 
-      # Build MkDocs site (outputs to ./site)
+      # MkDocs build
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -55,14 +44,10 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build --strict
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      # Publish static site/ to gh-pages branch
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: site
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
