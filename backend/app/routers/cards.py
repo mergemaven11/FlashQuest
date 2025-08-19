@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import asc, desc, func, or_
+from sqlalchemy import asc, desc, func, or_, update
 from sqlmodel import Session, select, delete
 
 from app.db import get_session
@@ -16,6 +16,7 @@ from app.models import (
     CardUpdate,
     UserCard,
     CardStats,
+    Review,
 )
 
 router = APIRouter()
@@ -249,3 +250,59 @@ def card_stats(session: Session = Depends(get_session)) -> CardStats:
         hard_to_remember=int(status_counts.get("hard_to_remember", 0)),
         by_bin=by_bin,
     )
+
+
+@router.post("/admin/reset")
+@router.post("/cards/admin/reset")
+def reset_all_progress(session: Session = Depends(get_session)):
+    """
+    Reset ALL progress for the default user:
+
+    - ensure a UserCard exists for every Card
+    - delete all Review rows for the user
+    - set UserCard: bin=0, wrong_count=0, next_review_at=NULL, status='active'
+    Returns basic counts for UI feedback.
+    """
+    # Ensure a UserCard exists for every Card
+    card_ids = session.exec(select(Card.id)).all()
+    existing_card_ids = set(
+        session.exec(
+            select(UserCard.card_id).where(UserCard.user_id == DEFAULT_USER_ID)
+        ).all()
+    )
+    to_insert = [cid for cid in card_ids if cid not in existing_card_ids]
+    for cid in to_insert:
+        session.add(
+            UserCard(
+                user_id=DEFAULT_USER_ID,
+                card_id=cid,
+                bin=0,
+                wrong_count=0,
+                next_review_at=None,
+                status="active",
+            )
+        )
+
+    # Delete all reviews for the user
+    deleted_reviews = (
+        session.exec(delete(Review).where(Review.user_id == DEFAULT_USER_ID)).rowcount
+        or 0
+    )
+
+    # Reset all usercards
+    updated_usercards = (
+        session.exec(
+            update(UserCard)
+            .where(UserCard.user_id == DEFAULT_USER_ID)
+            .values(bin=0, wrong_count=0, next_review_at=None, status="active")
+        ).rowcount
+        or 0
+    )
+
+    session.commit()
+    return {
+        "ok": True,
+        "inserted_usercards": len(to_insert),
+        "deleted_reviews": int(deleted_reviews),
+        "updated_usercards": int(updated_usercards),
+    }

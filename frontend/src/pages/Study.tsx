@@ -1,44 +1,32 @@
+// frontend/src/pages/Study.tsx
 import { useEffect, useState, useCallback } from "react";
-import { getStudyNext, postStudyAnswer, checkApi, apiBaseURL } from "../api";
+import { getStudyNext, postStudyAnswer, binLabel } from "../api";
+import type { StudyNext } from "../types";
 
 /**
- * API response when requesting the next study card.
- */
-export type Next =
-  | {
-      status: "ok";
-      card: {
-        id: number;
-        word: string;
-        definition: string;
-        bin: number;
-        status: string;
-      };
-    }
-  | { status: "temporarily_done" }
-  | { status: "permanently_done" };
-
-/**
- * Study screen with:
- * - gradient header + helpful diagnostics
- * - skeleton while loading
- * - friendly error view w/ retry
- * - keyboard shortcuts (Space/1/2)
+ * Study screen (black & white to match Admin).
+ *
+ * Features:
+ * - Loading skeleton
+ * - Friendly error with retry
+ * - Keyboard shortcuts: Space (reveal), 1 (wrong), 2 (correct)
+ * - Timer hint for the current bin (“Next in ~…") via api.binLabel
+ * - Collapsible “How this works” info card
+ * - Collapsible bin legend
  */
 export default function Study() {
-  const [data, setData] = useState<Next | null>(null);
+  const [data, setData] = useState<StudyNext | null>(null);
   const [showDef, setShowDef] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
+  const [showInfo, setShowInfo] = useState(true); // default open once
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [apiOK, setApiOK] = useState<boolean | null>(null);
 
   /** Load the next card with graceful error handling. */
   const loadNext = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
-      const ok = await checkApi();
-      setApiOK(ok);
       const res = await getStudyNext();
       setData(res);
       setShowDef(false);
@@ -53,13 +41,17 @@ export default function Study() {
     void loadNext();
   }, [loadNext]);
 
+  /**
+   * Submit an answer and immediately fetch the next item.
+   * @param result - "correct" or "wrong"
+   */
   const answer = useCallback(
     async (result: "correct" | "wrong") => {
       if (data?.status !== "ok") return;
       setLoading(true);
       setErr(null);
       try {
-        await postStudyAnswer({ cardId: data.card.id, result });
+        await postStudyAnswer(data.card.id, result);
         await loadNext();
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Failed to submit answer");
@@ -75,6 +67,7 @@ export default function Study() {
     const onKey = (e: KeyboardEvent) => {
       if (!data) return;
       if (e.key === " ") {
+        // Reveal definition
         e.preventDefault();
         setShowDef((s) => s || true);
       } else if (e.key === "1") {
@@ -89,43 +82,62 @@ export default function Study() {
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
-      {/* Top notice with API diagnostics */}
-      <div className="rounded-2xl bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-emerald-600 p-[1px] shadow-lg">
-        <div className="rounded-2xl bg-white p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 className="text-xl font-semibold text-slate-900">Study</h1>
-            <div className="flex items-center gap-2 text-xs sm:text-sm">
-              <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-700">
-                API: <code>{apiBaseURL()}</code>
-              </span>
-              <span
-                className={[
-                  "rounded-md px-2 py-1 text-white",
-                  apiOK == null
-                    ? "bg-slate-400"
-                    : apiOK
-                    ? "bg-emerald-600"
-                    : "bg-rose-600",
-                ].join(" ")}
-              >
-                {apiOK == null ? "checking…" : apiOK ? "connected" : "offline"}
-              </span>
-            </div>
-          </div>
-          <p className="mt-1 text-sm text-slate-600">
-            Tips: ensure the API is running and <code>VITE_API_URL</code> points to it.
-          </p>
+      {/* Header (black & white) */}
+      <div className="flex items-end justify-between">
+        <h1 className="text-2xl font-bold text-black">Study</h1>
+        <p className="text-xs text-neutral-500">Space = reveal, 1 = wrong, 2 = correct</p>
+      </div>
+
+      {/* Info card: How this works */}
+      <div className="rounded-2xl border border-black/10 bg-white p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-black">How this works</h2>
+          <button
+            className="rounded-lg border border-black/10 px-3 py-1 text-sm text-neutral-800 hover:bg-neutral-50 transition"
+            onClick={() => setShowInfo((s) => !s)}
+            aria-expanded={showInfo}
+            aria-controls="how-it-works"
+          >
+            {showInfo ? "Hide" : "Show"}
+          </button>
         </div>
+        {showInfo && (
+          <div id="how-it-works" className="mt-3 text-sm text-neutral-800 space-y-2">
+            <p>
+              You’ll see a word. Press <b>Space</b> to reveal the definition, then mark your
+              response:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                <b>Got it (2)</b>: the card moves up to a higher <i>bin</i> and will reappear less
+                often.
+              </li>
+              <li>
+                <b>Didn’t get it (1)</b>: the card resets to <b>bin 1</b> and will reappear very
+                soon.
+              </li>
+            </ul>
+            <p>
+              Each bin has an approximate delay (e.g. bin 1 ≈ <b>5s</b>, bin 7 ≈ <b>1d</b>).
+              Reaching bin 11 marks the card as <b>never</b>. If you get a card wrong 10+ times,
+              it’s marked <b>hard_to_remember</b> and hidden.
+            </p>
+            <p className="text-neutral-600">
+              Selection priority: due cards first, then new cards. Use the legend below to see all
+              bin delays.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Error view */}
       {err && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-5">
-          <h2 className="text-lg font-semibold text-rose-900">We hit a snag</h2>
-          <p className="mt-1 text-rose-800">{err}</p>
+        <div className="rounded-2xl border border-black/10 bg-white p-5">
+          <h2 className="text-lg font-semibold text-black">We hit a snag</h2>
+          <p className="mt-1 text-neutral-700">{err}</p>
           <div className="mt-4 flex gap-3">
             <button
-              className="rounded-xl bg-rose-600 px-4 py-2 font-medium text-white hover:bg-rose-700"
+              className="rounded-xl border border-black bg-black px-4 py-2 font-medium text-white hover:bg-white hover:text-black transition"
               onClick={() => void loadNext()}
             >
               Retry
@@ -136,24 +148,24 @@ export default function Study() {
 
       {/* Loading skeleton */}
       {loading && !data && !err && (
-        <div className="animate-pulse rounded-2xl border border-slate-200 bg-white p-8">
-          <div className="mb-4 h-5 w-24 rounded bg-slate-200" />
-          <div className="mb-6 h-10 w-2/3 rounded bg-slate-200" />
-          <div className="h-20 w-full rounded bg-slate-100" />
+        <div className="animate-pulse rounded-2xl border border-black/10 bg-white p-8">
+          <div className="mb-4 h-5 w-24 rounded bg-neutral-200" />
+          <div className="mb-6 h-10 w-2/3 rounded bg-neutral-200" />
+          <div className="h-20 w-full rounded bg-neutral-100" />
           <div className="mt-6 flex gap-3">
-            <div className="h-9 w-32 rounded bg-slate-200" />
-            <div className="h-9 w-32 rounded bg-slate-200" />
+            <div className="h-9 w-32 rounded bg-neutral-200" />
+            <div className="h-9 w-32 rounded bg-neutral-200" />
           </div>
         </div>
       )}
 
       {/* Primary states */}
       {data?.status === "temporarily_done" && !loading && !err && (
-        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-6">
-          <h2 className="text-lg font-semibold text-indigo-900">You’re temporarily done</h2>
-          <p className="mt-1 text-slate-600">Nothing due right now. Check back soon.</p>
+        <div className="rounded-2xl border border-black/10 bg-white p-6">
+          <h2 className="text-lg font-semibold text-black">You’re temporarily done</h2>
+          <p className="mt-1 text-neutral-600">Nothing due right now. Check back soon.</p>
           <button
-            className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700"
+            className="mt-4 rounded-xl border border-black bg-black px-4 py-2 font-medium text-white hover:bg-white hover:text-black transition"
             onClick={() => void loadNext()}
           >
             Refresh
@@ -162,9 +174,9 @@ export default function Study() {
       )}
 
       {data?.status === "permanently_done" && !loading && !err && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 text-center">
-          <h2 className="text-xl font-semibold text-emerald-900">You’re permanently done 🎉</h2>
-          <p className="mt-1 text-slate-600">
+        <div className="rounded-2xl border border-black/10 bg-white p-6 text-center">
+          <h2 className="text-xl font-semibold text-black">You’re permanently done 🎉</h2>
+          <p className="mt-1 text-neutral-600">
             All cards are either <b>never</b> or <b>hard to remember</b>.
           </p>
         </div>
@@ -172,39 +184,33 @@ export default function Study() {
 
       {data?.status === "ok" && !err && (
         <>
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-fuchsia-100/40 ring-1 ring-black/5">
+          <div className="rounded-2xl border border-black/10 bg-white p-8">
             <div className="mb-4 flex items-center justify-between">
-              <span className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-3 py-1 text-xs font-semibold text-white shadow">
+              <span className="inline-flex items-center gap-2 rounded-full border border-black px-3 py-1 text-xs font-semibold text-black">
                 Bin {data.card.bin}
               </span>
-              <span
-                className={[
-                  "rounded-full px-2.5 py-1 text-xs font-medium",
-                  data.card.status === "active" && "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200",
-                  data.card.status === "never" && "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
-                  data.card.status === "hard_to_remember" &&
-                    "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
+              <span className="rounded-full border border-black px-2.5 py-1 text-xs font-medium text-black">
                 {data.card.status}
               </span>
             </div>
 
-            <h2 className="mb-6 bg-gradient-to-r from-indigo-600 to-fuchsia-600 bg-clip-text text-4xl font-extrabold text-transparent">
-              {data.card.word}
-            </h2>
+            <h2 className="mb-4 text-4xl font-extrabold text-black">{data.card.word}</h2>
+
+            {/* Timer hint for current bin */}
+            <p className="mb-6 text-sm text-neutral-600">
+              Next in{" "}
+              <span className="font-medium text-black">~{binLabel(data.card.bin)}</span>
+            </p>
 
             {!showDef ? (
               <button
-                className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="inline-flex items-center rounded-xl border border-black bg-black px-4 py-2 font-medium text-white hover:bg-white hover:text-black transition"
                 onClick={() => setShowDef(true)}
               >
                 Show definition
               </button>
             ) : (
-              <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-lg text-slate-800">
+              <p className="rounded-xl border border-black/10 bg-neutral-50 p-4 text-lg text-neutral-900">
                 {data.card.definition}
               </p>
             )}
@@ -212,27 +218,53 @@ export default function Study() {
 
           <div className="flex flex-wrap gap-3">
             <button
-              className="inline-flex items-center rounded-xl bg-rose-600 px-4 py-2 font-medium text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              className="inline-flex items-center rounded-xl border border-black px-4 py-2 font-medium text-black hover:bg-black hover:text-white transition"
               onClick={() => void answer("wrong")}
               disabled={loading}
             >
               I didn’t get it
             </button>
             <button
-              className="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="inline-flex items-center rounded-xl border border-black bg-black px-4 py-2 font-medium text-white hover:bg-white hover:text-black transition"
               onClick={() => void answer("correct")}
               disabled={loading}
             >
               I got it
             </button>
             <button
-              className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+              className="inline-flex items-center rounded-xl border border-black/10 bg-white px-4 py-2 font-medium text-neutral-800 hover:bg-neutral-50 transition"
               onClick={() => void loadNext()}
               disabled={loading}
             >
               Skip / Next
             </button>
+
+            <button
+              className="ml-auto inline-flex items-center rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-neutral-800 hover:bg-neutral-50 transition"
+              onClick={() => setShowLegend((s) => !s)}
+              aria-expanded={showLegend}
+            >
+              {showLegend ? "Hide" : "Show"} bin legend
+            </button>
           </div>
+
+          {/* Collapsible bin legend */}
+          {showLegend && (
+            <div className="rounded-2xl border border-black/10 bg-white p-6">
+              <h3 className="mb-3 text-sm font-semibold text-black">Spaced Repetition Bins</h3>
+              <ul className="grid grid-cols-2 gap-2 text-sm text-neutral-800 sm:grid-cols-3">
+                {Array.from({ length: 12 }, (_, i) => i).map((i) => (
+                  <li
+                    key={i}
+                    className="flex items-center justify-between rounded-lg border border-black/10 bg-neutral-50 px-3 py-2"
+                  >
+                    <span className="font-medium text-black">Bin {i}</span>
+                    <span className="text-neutral-700">{binLabel(i)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
     </div>
