@@ -8,7 +8,7 @@ primary_region = 'atl'
 
 [build]
   # Using your Dockerfile in /backend
-  dockerfile = "Dockerfile"
+  dockerfile = "./Dockerfile"
 
 [deploy]
   release_command = "alembic -c /app/alembic.ini upgrade head"
