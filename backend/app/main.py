@@ -24,7 +24,11 @@ def _allowed_origins() -> list[str]:
             e.g. '["https://your-site.netlify.app"]'
                  or 'https://your-site.netlify.app,https://another-site.com'
     """
-    defaults = {"http://localhost:5173", "http://127.0.0.1:5173"}
+    defaults = {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://flashcards-tobias.netlify.app",
+    }
 
     # Settings.ALLOWED_ORIGINS is a list[str]; if the env var is set as JSON,
     # pydantic will parse it. Comma-delimited fallback is handled in config.py.
