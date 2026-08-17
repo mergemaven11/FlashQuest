@@ -1,14 +1,14 @@
-# FlashQuest 🎮🧠
+# FlashQuest’s 🎮🧠
 
 **Learn it. Break it. Fix it. Remember it.**
 
-A game-like **Platform Engineering study + troubleshooting app** built with React, FastAPI, PostgreSQL, Alembic, and Docker.
+FlashQuest’s is a game-like **Platform Engineering study + troubleshooting app** built with React, FastAPI, PostgreSQL, Alembic, and Docker.
 
 [![CI](https://github.com/mergemaven11/flashcards/actions/workflows/ci.yml/badge.svg)](https://github.com/mergemaven11/flashcards/actions/workflows/ci.yml)
 [![Docs Deploy](https://github.com/mergemaven11/flashcards/actions/workflows/docs-deploy.yml/badge.svg)](https://github.com/mergemaven11/flashcards/actions/workflows/docs-deploy.yml)
 [![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://flashcards-docs.netlify.app/)
 
-FlashQuest gives you **216 built-in Platform Engineering challenges** and moves them through a spaced-repetition mastery system:
+FlashQuest’s ships with **216 built-in Platform Engineering challenges**:
 
 - **144 concept / interview cards** — understand the systems.
 - **72 hands-on lab / break-fix cards** — diagnose, design, and fix the systems.
@@ -16,13 +16,13 @@ FlashQuest gives you **216 built-in Platform Engineering challenges** and moves 
 - **PostgreSQL-backed progress** — study state survives browser sessions.
 - **Game feedback** — XP, levels, combos, accuracy, mastery, and deck progression.
 
-The application itself is also a Platform Engineering portfolio project: dependency-aware health checks, Alembic migrations, request correlation, non-root containers, environment-driven configuration, PostgreSQL migration testing, and CI quality gates.
+The application itself is also a Platform Engineering portfolio project: dependency-aware health checks, explicit Alembic migrations, request correlation, non-root containers, environment-driven configuration, PostgreSQL migration testing, and CI quality gates.
 
 ---
 
 ## 🚀 Quick start
 
-A fresh environment needs **four steps in this order**: start services, migrate the schema, seed the curriculum, then verify readiness.
+A fresh environment should be brought up in this order: **start → migrate → seed → verify**.
 
 ```bash
 git clone https://github.com/mergemaven11/flashcards.git
@@ -38,7 +38,7 @@ docker compose exec api python -m app.seed
 
 Open:
 
-- **FlashQuest:** `http://localhost:5173`
+- **FlashQuest’s:** `http://localhost:5173`
 - **FastAPI / OpenAPI:** `http://localhost:8080/docs`
 - **API readiness:** `http://localhost:8080/health/ready`
 - **PostgreSQL host port:** `5433`
@@ -82,7 +82,7 @@ Every domain contains **12 concept cards + 6 lab scenarios = 18 challenges**.
 
 ## Concept cards
 
-These are written more like **Platform Engineer interview questions** than vocabulary definitions.
+FlashQuest’s concept cards are written like Platform Engineer interview questions rather than vocabulary definitions.
 
 Examples:
 
@@ -130,7 +130,7 @@ LAB · Incident · Error rate jumps immediately after a deployment.
 What is your first operational move?
 ```
 
-The lab deck covers work such as:
+The lab deck includes:
 
 - setting up services and environments safely;
 - troubleshooting systemd, disk, memory, load, inodes, and file descriptors;
@@ -166,9 +166,9 @@ Automated tests verify:
 
 ---
 
-# 🎮 Study experience
+# 🎮 FlashQuest’s study experience
 
-FlashQuest is designed as a **memory quest**, not a plain CRUD dashboard.
+FlashQuest’s is designed as a **memory quest**, not a plain CRUD dashboard.
 
 - ⚡ session XP and player levels
 - 🔥 correct-answer combos and best streak
@@ -220,7 +220,7 @@ Rules:
 ```text
 ┌──────────────────────┐
 │ React + TypeScript   │
-│ FlashQuest frontend  │
+│ FlashQuest’s UI      │
 └──────────┬───────────┘
            │ HTTP / JSON
            ▼
@@ -255,7 +255,7 @@ Rules:
 
 ---
 
-# 🛠️ Platform Engineering built into FlashQuest
+# 🛠️ Platform Engineering built into FlashQuest’s
 
 | Area | Implementation |
 | --- | --- |
@@ -294,7 +294,7 @@ X-Request-ID
 X-Response-Time-Ms
 ```
 
-If the caller supplies `X-Request-ID`, FlashQuest propagates it. Otherwise the API generates one.
+If the caller supplies `X-Request-ID`, FlashQuest’s propagates it. Otherwise the API generates one.
 
 ---
 
@@ -333,8 +333,8 @@ Pull requests validate four layers:
    - compile
    - pytest
    - curriculum size/balance/idempotency tests
-   - Ruff
-   - Black check
+   - Ruff correctness checks
+   - Black formatting check for the upgraded platform code
 2. **Frontend**
    - clean `npm ci`
    - ESLint
@@ -348,6 +348,25 @@ Pull requests validate four layers:
    - web image build
 
 CI is intentionally a **quality gate**, not a workflow that silently rewrites contributor code and pushes it back to the branch.
+
+---
+
+# 🌐 Deployment notes
+
+The repository currently contains two separate web-facing concerns:
+
+- the **FlashQuest’s React application** under `frontend/`;
+- the **FlashQuest’s MkDocs documentation site** built from `netlify.toml` at the repository root.
+
+For a Netlify site that deploys the React application, use:
+
+```text
+Base directory: frontend
+Build command: npm run build
+Publish directory: dist
+```
+
+Set `VITE_API_URL` in that app site to the deployed FastAPI base URL. The root `netlify.toml` is for the documentation site and should not be repurposed accidentally for the React application.
 
 ---
 
@@ -377,21 +396,6 @@ uvicorn app.main:app --reload --port 8080
 cd frontend
 npm ci
 npm run dev
-```
-
-### Quality checks
-
-```bash
-# backend
-cd backend
-python -m pytest -q
-ruff check . --exclude alembic/versions
-black --check . --extend-exclude 'alembic/versions'
-
-# frontend
-cd frontend
-npm run lint
-npm run build
 ```
 
 ---
@@ -424,9 +428,9 @@ npm run build
 
 ---
 
-# 🎯 Why this belongs in a Platform Engineering portfolio
+# 🎯 Why FlashQuest’s belongs in a Platform Engineering portfolio
 
-FlashQuest is both **the project and the practice environment**.
+FlashQuest’s is both **the project and the practice environment**.
 
 You can use it to prepare answers for questions such as:
 
@@ -473,7 +477,7 @@ Then repeat **start → migrate → seed** from the Quick start section.
 
 <div align="center">
 
-### ⚡ FlashQuest
+### ⚡ FlashQuest’s
 
 **Learn it. Break it. Fix it. Remember it.**
 
