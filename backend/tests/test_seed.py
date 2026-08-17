@@ -11,7 +11,10 @@ from app.seed import (
 
 def test_platform_deck_has_144_unique_balanced_cards():
     assert len(PLATFORM_ENGINEERING_DECK_BY_DOMAIN) == 12
-    assert all(len(cards) == 12 for cards in PLATFORM_ENGINEERING_DECK_BY_DOMAIN.values())
+    assert all(
+        len(cards) == 12
+        for cards in PLATFORM_ENGINEERING_DECK_BY_DOMAIN.values()
+    )
     assert len(PLATFORM_ENGINEERING_DECK) == 144
 
     prompts = [prompt for prompt, _ in PLATFORM_ENGINEERING_DECK]
