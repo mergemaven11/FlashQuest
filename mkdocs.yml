@@ -1,5 +1,5 @@
-site_name: FlashQuest Docs
-site_description: Game-like spaced repetition with production-minded platform engineering.
+site_name: FlashQuest’s Docs
+site_description: FlashQuest’s game-like Platform Engineering study and troubleshooting experience.
 theme:
   name: material
 
