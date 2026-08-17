@@ -24,7 +24,7 @@ LAB_DECK_PATH = DATA_DIR / "platform_engineering_labs.json"
 
 
 def load_deck(path: Path) -> dict[str, list[tuple[str, str]]]:
-    """Load and validate a versioned FlashQuest curriculum file."""
+    """Load and validate a versioned FlashQuest’s curriculum file."""
     payload: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     domains: dict[str, list[tuple[str, str]]] = {}
     prompts: set[str] = set()
@@ -119,7 +119,7 @@ def run() -> None:
         result = seed_platform_deck(session)
 
     print(
-        "FlashQuest Platform Engineering deck ready: "
+        "FlashQuest’s Platform Engineering deck ready: "
         f"{result['deck_size']} cards "
         f"({result['concept_cards']} concepts + {result['lab_cards']} labs; "
         f"{result['inserted_cards']} inserted, "
