@@ -1,114 +1,129 @@
-# Hiring Flashcards
+# FlashQuest’s 🎮🧠
 
-A minimal, production-minded **spaced repetition** web app for vocabulary study.  
-Built with **React (Vite)** + **FastAPI** + **PostgreSQL**, packaged via **Docker Compose**, and documented with **MkDocs** + **TypeDoc** + **mkdocstrings**.
+**Learn it. Break it. Fix it. Remember it.**
 
----
+FlashQuest’s is a game-like **Platform Engineering study and troubleshooting app** built with React, FastAPI, PostgreSQL, Alembic, and Docker.
 
-## 📚 What this app does
+It ships with a built-in **216-card Platform Engineering curriculum**:
 
-- Create **flashcards** (word + definition)
-- Study loop: show **word** → *reveal definition* → mark **I got it** / **I did not**
-- Cards move through **12 mastery bins (0–11)**; higher bins wait longer between reviews
-- If a card is answered **wrong** 10 times (lifetime), it becomes **hard_to_remember** and is hidden
-- If all cards are **never** or **hard_to_remember**, the user is **permanently done**
+- **144 concept / interview cards** for core knowledge;
+- **72 hands-on lab / break-fix cards** for operational scenarios;
+- **12 domains** spanning Linux, networking, containers, Kubernetes, CI/CD, cloud, Terraform/IaC, observability, databases, security, SRE/reliability, and incident response;
+- PostgreSQL-backed spaced-repetition progress across **12 mastery levels**;
+- session XP, combos, accuracy, checkpoints, and mastery feedback.
 
-**Bin delays**
-
-| Bin | Delay        |
-|-----|--------------|
-| 0   | new (none)   |
-| 1   | 5s           |
-| 2   | 25s          |
-| 3   | 2m           |
-| 4   | 10m          |
-| 5   | 1h           |
-| 6   | 5h           |
-| 7   | 1d           |
-| 8   | 5d           |
-| 9   | 25d          |
-| 10  | ~4mo         |
-| 11  | never        |
-
-**Rules (short):**  
-Correct → next bin (max 11).  
-Wrong → bin 1 + `wrong_count++`.  
-`wrong_count >= 10` → `hard_to_remember`.
+The repository is also a Platform Engineering portfolio project: dependency-aware readiness, Alembic migrations, request correlation, non-root containers, environment-driven configuration, PostgreSQL migration testing, and CI quality gates.
 
 ---
 
-## 🧭 Docs map (start here)
+## 🧪 Learn it, then fix it
 
-- **Backend API (FastAPI, Python docstrings)** → [Backend / API](backend/api.md)  
-  Study & admin endpoints, datamodels, selection logic.
-
-- **Frontend Reference (React, JSDoc → Markdown)** → [Frontend / Reference](frontend/modules.md)  
-  Components, types, and API client helpers.
-
-> This site is generated from **comments in code**: Python docstrings via `mkdocstrings`, and TypeScript JSDoc via `typedoc-plugin-markdown`.
-
----
-
-## 🏗️ Architecture (overview)
-
-┌───────────┐ HTTP/JSON ┌───────────────┐ SQL ┌──────────────┐
-│ React │ <────────────────────> │ FastAPI │ <──────────────> │ Postgres │
-│ (SPA) │ /study/* /cards/* │ (Uvicorn) │ SQLModel ORM │ (state) │
-└───────────┘ └───────────────┘ └──────────────┘
-▲
-│ Static assets
-└──────── Nginx (Docker)
-
-
-- **Frontend**: Vite (TypeScript), simple SPA with routes for `/study` and `/admin`
-- **Backend**: FastAPI + SQLModel (SQLAlchemy), Alembic migrations, documented with Google-style docstrings
-- **DB**: PostgreSQL (local via Docker; deploy-ready for Neon/Fly.io)
-- **Containers**: separate images for `web` (Nginx+SPA) and `api` (Uvicorn+FastAPI)
-
----
-
-## 🎯 Study selection (spec-driven)
-
-1. If there are **due** active cards (`next_review_at <= now`), show them first:
-   - higher **bin** first → earlier **due time** → lowest **card id**
-2. If no due cards, draw **new** cards from **bin 0**
-3. If there are no new cards and nothing due:
-   - show: **“You are temporarily done; please come back later to review more words.”**
-4. If all cards are either **bin 11 (never)** or **hard_to_remember**:
-   - show: **“You have no more words to review; you are permanently done!”**
-
-**Tiny example**
+Concept cards ask questions such as:
 
 ```text
-New card starts in bin 0 → drawn when nothing is due.
-You answer correct → moves to bin 1, next_review_at = now + 5s.
-After 5s, it’s due. If you answer wrong → bin 1 again, wrong_count++.
-Keep getting it right → climbs bins; reaching bin 11 sets status never.
-If wrong_count = 10 at any point → hard_to_remember (hidden forever).
+Kubernetes · What is the difference between liveness and readiness probes?
+Terraform · What does drift mean?
+Observability · What is an error budget?
 ```
 
-## 🚀 Quickstart (local with Docker)
+Lab cards put you into operational situations:
 
-# Build & run stack
-docker compose up --build
+```text
+LAB · Kubernetes · A Service has no traffic even though Pods are Running.
+What do you check?
 
-**URLs**
- API docs: http://localhost:8080/docs
- Web app:  http://localhost:5173
+LAB · CI/CD · Tests pass locally but fail in CI.
+What do you compare first?
 
-(Optional) Seed a few cards
+LAB · Databases · The API reports "too many connections".
+What do you inspect and fix?
+```
+
+The curriculum is versioned as data under `backend/app/data/`, and the seed process is idempotent so curriculum updates can be loaded without duplicating existing cards or study-progress rows.
+
+---
+
+## 🚀 Quick start
+
+A fresh environment should be started in this order: **start → migrate → seed → verify**.
+
+```bash
+git clone https://github.com/mergemaven11/flashcards.git
+cd flashcards
+
+docker compose up --build -d
+
+docker compose exec api \
+  alembic -c /app/alembic.ini upgrade head
+
 docker compose exec api python -m app.seed
+```
 
-## Migrations (Alembic)
+Open:
 
-**Generate migration from models** 
+- **FlashQuest’s:** `http://localhost:5173`
+- **FastAPI / OpenAPI:** `http://localhost:8080/docs`
+- **Readiness:** `http://localhost:8080/health/ready`
 
-docker compose exec api alembic -c /app/alembic.ini revision --autogenerate -m "desc"
+Verify:
 
-**Apply latest** 
+```bash
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+```
 
-docker compose exec api alembic -c /app/alembic.ini upgrade head
+---
 
-**Show current**
+## 🏗️ Runtime architecture
 
-docker compose exec api alembic -c /app/alembic.ini current
+```text
+React / TypeScript SPA
+        |
+        | HTTP / JSON
+        v
+FastAPI application
+        |
+        | SQLModel / SQLAlchemy
+        v
+PostgreSQL 16
+        ^
+        |
+Alembic migrations
+```
+
+Local Docker Compose keeps those same service boundaries: web, API, and database.
+
+---
+
+## ❤️ Operational model
+
+FlashQuest’s separates liveness from readiness:
+
+- `GET /health` — backwards-compatible lightweight health response;
+- `GET /health/live` — confirms the API process is alive and returns service metadata;
+- `GET /health/ready` — executes a database query and returns `503` when PostgreSQL is unavailable.
+
+API responses also include `X-Request-ID` and `X-Response-Time-Ms` for request correlation and basic latency visibility.
+
+---
+
+## ✅ CI quality gates
+
+Pull requests validate:
+
+1. backend tests on Python 3.11 and 3.12;
+2. Ruff correctness checks and Black formatting checks;
+3. frontend ESLint and TypeScript/Vite production builds;
+4. Alembic migration against clean PostgreSQL 16;
+5. Docker Compose configuration plus API and web image builds;
+6. MkDocs / TypeDoc documentation build.
+
+---
+
+## 🧭 Docs map
+
+- [Platform Engineering design](PLATFORM_ENGINEERING.md)
+- [Backend API reference](backend/api.md)
+- [Frontend reference](frontend/modules.md)
+
+The deeper Platform Engineering page explains health semantics, configuration, failure boundaries, CI design, and portfolio/interview talking points.
