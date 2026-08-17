@@ -1,23 +1,68 @@
 # FlashQuest 🎮🧠
 
-**A game-like Platform Engineering study and troubleshooting app built as a production-minded full-stack platform project.**
+**Learn it. Break it. Fix it. Remember it.**
+
+A game-like **Platform Engineering study + troubleshooting app** built with React, FastAPI, PostgreSQL, Alembic, and Docker.
 
 [![CI](https://github.com/mergemaven11/flashcards/actions/workflows/ci.yml/badge.svg)](https://github.com/mergemaven11/flashcards/actions/workflows/ci.yml)
 [![Docs Deploy](https://github.com/mergemaven11/flashcards/actions/workflows/docs-deploy.yml/badge.svg)](https://github.com/mergemaven11/flashcards/actions/workflows/docs-deploy.yml)
 [![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://flashcards-docs.netlify.app/)
 
-FlashQuest turns Platform Engineering preparation into a memory game with **216 built-in study challenges** backed by PostgreSQL:
+FlashQuest gives you **216 built-in Platform Engineering challenges** and moves them through a spaced-repetition mastery system:
 
-- **144 concept/interview cards** — understand the systems.
-- **72 hands-on lab/troubleshooting cards** — diagnose, design, and fix the systems.
+- **144 concept / interview cards** — understand the systems.
+- **72 hands-on lab / break-fix cards** — diagnose, design, and fix the systems.
+- **12 domains** — Linux through incident response.
+- **PostgreSQL-backed progress** — study state survives browser sessions.
+- **Game feedback** — XP, levels, combos, accuracy, mastery, and deck progression.
 
-The app also demonstrates platform-engineering practices in its own architecture: FastAPI, PostgreSQL, Alembic migrations, React/TypeScript, Docker Compose, non-root containers, liveness/readiness checks, request correlation, CI quality gates, and reproducible seed data.
+The application itself is also a Platform Engineering portfolio project: dependency-aware health checks, Alembic migrations, request correlation, non-root containers, environment-driven configuration, PostgreSQL migration testing, and CI quality gates.
 
 ---
 
-## 216-card Platform Engineering curriculum
+## 🚀 Quick start
 
-The built-in curriculum spans **12 domains**. Every domain contains **12 concept cards + 6 lab scenarios = 18 challenges**, for **216 total cards**.
+A fresh environment needs **four steps in this order**: start services, migrate the schema, seed the curriculum, then verify readiness.
+
+```bash
+git clone https://github.com/mergemaven11/flashcards.git
+cd flashcards
+
+docker compose up --build -d
+
+docker compose exec api \
+  alembic -c /app/alembic.ini upgrade head
+
+docker compose exec api python -m app.seed
+```
+
+Open:
+
+- **FlashQuest:** `http://localhost:5173`
+- **FastAPI / OpenAPI:** `http://localhost:8080/docs`
+- **API readiness:** `http://localhost:8080/health/ready`
+- **PostgreSQL host port:** `5433`
+
+Verify the stack:
+
+```bash
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+```
+
+The seed command is safe to run again whenever the built-in curriculum changes:
+
+```bash
+docker compose exec api python -m app.seed
+```
+
+It is **idempotent**: existing cards are reused, new built-in cards are added, and missing default-user progress rows are repaired without duplicating the deck.
+
+---
+
+# 📚 216-card Platform Engineering curriculum
+
+Every domain contains **12 concept cards + 6 lab scenarios = 18 challenges**.
 
 | Domain | Concepts | Labs | Total |
 | --- | ---: | ---: | ---: |
@@ -35,21 +80,23 @@ The built-in curriculum spans **12 domains**. Every domain contains **12 concept
 | Incident Response | 12 | 6 | 18 |
 | **Total** | **144** | **72** | **216** |
 
-### Concept cards
+## Concept cards
 
-Concept cards are written like interview questions instead of glossary definitions.
+These are written more like **Platform Engineer interview questions** than vocabulary definitions.
 
 Examples:
 
-- `Kubernetes · What is the difference between liveness and readiness probes?`
-- `Terraform · What does drift mean?`
-- `Observability · What is an error budget?`
-- `SRE · What is exponential backoff with jitter?`
-- `Databases · What is point-in-time recovery?`
+```text
+Kubernetes · What is the difference between liveness and readiness probes?
+Terraform · What does drift mean?
+Observability · What is an error budget?
+SRE · What is exponential backoff with jitter?
+Databases · What is point-in-time recovery?
+```
 
-### 🧪 Lab / break-fix cards
+## 🧪 Lab / break-fix cards
 
-Lab cards start with `LAB ·` and put you in a practical Platform Engineer situation. The answer is a **diagnostic path or implementation plan**, not just a term to memorize.
+Lab prompts start with `LAB ·` and put you inside an operational situation. The answer gives you a troubleshooting path, implementation plan, or safe recovery sequence.
 
 Examples:
 
@@ -74,8 +121,8 @@ What do you do?
 ```
 
 ```text
-LAB · Databases · API errors with "too many connections".
-What do you inspect?
+LAB · Databases · The API reports "too many connections".
+What do you inspect and fix?
 ```
 
 ```text
@@ -83,68 +130,64 @@ LAB · Incident · Error rate jumps immediately after a deployment.
 What is your first operational move?
 ```
 
-The lab deck includes scenarios such as:
+The lab deck covers work such as:
 
 - setting up services and environments safely;
-- troubleshooting systemd, memory, disk, file descriptors, and load;
-- debugging DNS, TCP, TLS, proxies, MTU, and 502s;
+- troubleshooting systemd, disk, memory, load, inodes, and file descriptors;
+- debugging DNS, TCP, TLS, proxies, MTU, routing, and 502s;
 - fixing container startup, networking, persistence, permissions, and health checks;
-- debugging CrashLoopBackOff, Pending Pods, failed rollouts, probes, and Services;
-- repairing CI failures, slow pipelines, leaked secrets, deployment rollback, and artifact flow;
-- investigating cloud exposure, scaling, cost spikes, private networking, and workload identity;
-- handling Terraform drift, imports, state locking, dangerous plans, secrets, and module design;
-- diagnosing latency, noisy alerts, request tracing, SLOs, and telemetry cost;
-- fixing DB connection exhaustion, slow queries, risky migrations, deadlocks, and recovery;
+- debugging `CrashLoopBackOff`, Pending Pods, probes, failed rollouts, and Services with no endpoints;
+- repairing CI failures, slow pipelines, leaked secrets, rollbacks, and artifact flow;
+- investigating cloud exposure, autoscaling, cost spikes, private networking, and workload identity;
+- handling Terraform drift, state locks, imports, dangerous plans, secrets, and module design;
+- diagnosing latency, noisy alerts, tracing gaps, SLOs, and telemetry cost;
+- fixing database connection exhaustion, slow queries, risky migrations, deadlocks, and recovery;
 - responding to CVEs, leaked credentials, excessive IAM, and software supply-chain risk;
-- designing retries, graceful degradation, idempotent jobs, chaos tests, and queue recovery;
-- running incident command, mitigation, customer communication, timelines, and postmortems.
+- designing retries, idempotent jobs, graceful degradation, circuit breakers, and chaos tests;
+- running incidents: triage, mitigation, incident command, rollback, communications, timelines, and postmortems.
 
----
+### Curriculum data
 
-## Seed the PostgreSQL study database
+The built-in curriculum is versioned separately from application code:
 
-Start the stack and load all **216 cards**:
-
-```bash
-docker compose up --build -d
-docker compose exec api python -m app.seed
+```text
+backend/app/data/
+├── platform_engineering_cards.json   # 144 concepts
+└── platform_engineering_labs.json    # 72 break/fix labs
 ```
 
-The seed is **idempotent**:
+Automated tests verify:
 
-- the first run inserts missing cards;
-- later runs do not create duplicates;
-- missing default-user progress rows are repaired;
-- concept and lab decks are stored as versioned JSON curriculum data;
-- automated tests verify **144 concepts + 72 labs = 216 unique cards**;
-- rerunning the seed must leave the database at the same 216-card curriculum.
-
-This makes the learning content itself reproducible environment data instead of manual database setup.
+- 144 concept cards;
+- 72 lab cards;
+- 216 unique prompts total;
+- balanced domain counts;
+- rerunning the seed does not create duplicate cards or progress rows.
 
 ---
 
-## What the game feels like
+# 🎮 Study experience
 
-FlashQuest is designed as a **memory quest**, not a generic CRUD dashboard:
+FlashQuest is designed as a **memory quest**, not a plain CRUD dashboard.
 
 - ⚡ session XP and player levels
-- 🔥 correct-answer combos and best-streak tracking
+- 🔥 correct-answer combos and best streak
 - 🎯 session accuracy
 - ⭐ mastery based on the real backend spaced-repetition bin
 - ✨ animated answer/reward feedback
 - 🗺️ 12-level mastery map
 - 🏆 checkpoint and deck-completion states
-- ⌨️ `Space` reveal, `1` missed, `2` nailed it
-- 🧪 Deck Lab for card administration
-- 🗺️ Deck Map for learning progress + runtime status
+- ⌨️ keyboard controls: `Space` reveal, `1` missed, `2` nailed it
+- 🧪 **Deck Lab** for card administration
+- 🗺️ **Deck Map** for learning progress + runtime status
 
-Game XP and combo values are intentionally session-local. Durable study state remains in PostgreSQL.
+XP and combo values are intentionally session-local presentation state. **Durable mastery, review history, and card state live in PostgreSQL.**
 
 ---
 
-## Spaced repetition engine
+# 🧠 Spaced repetition
 
-Cards move through **12 mastery bins (`0`–`11`)**. Higher bins have longer delays before a card becomes due again.
+Cards move through **12 mastery bins (`0`–`11`)**. Higher bins wait longer before becoming due again.
 
 | Bin | Approx. delay |
 | --- | --- |
@@ -163,34 +206,16 @@ Cards move through **12 mastery bins (`0`–`11`)**. Higher bins have longer del
 
 Rules:
 
-- correct → advance one bin;
-- wrong → return to bin 1 and increment lifetime wrong count;
-- repeated misses can mark a card `hard_to_remember`;
-- terminal mastery removes a card from the active study queue;
-- due cards are selected before new cards;
-- every answer creates a `Review` record for later analytics.
+- **Correct** → advance one bin.
+- **Wrong** → return to bin 1 and increment the lifetime wrong count.
+- Repeated misses can mark a card `hard_to_remember`.
+- Terminal mastery removes a card from the active study queue.
+- Due cards are selected before new cards.
+- Every submitted answer creates a `Review` record for later analytics.
 
 ---
 
-## Platform Engineering signals in the project itself
-
-| Area | Implementation |
-| --- | --- |
-| **Service health** | separate liveness and database-backed readiness endpoints |
-| **Observability** | `X-Request-ID` propagation/generation and response timing headers |
-| **Configuration** | environment-driven DB, CORS, version, environment, and frontend API settings |
-| **Database lifecycle** | Alembic migrations; startup does not silently mutate schema |
-| **Seed lifecycle** | idempotent 216-card curriculum with regression tests |
-| **Containers** | Docker Compose for React/FastAPI/Postgres; API runs non-root |
-| **Dependency ordering** | API waits for PostgreSQL health; web waits for API readiness |
-| **CI/CD** | backend matrix, frontend lint/build, PostgreSQL migration smoke test, image builds |
-| **Product boundaries** | durable learning state separated from ephemeral UI gamification |
-
-See [`docs/PLATFORM_ENGINEERING.md`](docs/PLATFORM_ENGINEERING.md) for architecture and operational design details.
-
----
-
-## Architecture
+# 🏗️ Architecture
 
 ```text
 ┌──────────────────────┐
@@ -208,8 +233,9 @@ See [`docs/PLATFORM_ENGINEERING.md`](docs/PLATFORM_ENGINEERING.md) for architect
 ┌──────────────────────┐
 │ PostgreSQL 16        │
 │ cards + reviews      │
-└──────────▲───────────┘
-           │
+└──────────────────────┘
+           ▲
+           │ schema lifecycle
 ┌──────────┴───────────┐
 │ Alembic migrations   │
 └──────────────────────┘
@@ -217,51 +243,39 @@ See [`docs/PLATFORM_ENGINEERING.md`](docs/PLATFORM_ENGINEERING.md) for architect
 
 ### Core stack
 
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, Axios, React Router
-- **Backend:** FastAPI, SQLModel/SQLAlchemy, Pydantic Settings, Uvicorn
-- **Database:** PostgreSQL 16
-- **Schema lifecycle:** Alembic
-- **Containers:** Docker + Docker Compose
-- **Docs:** MkDocs Material + mkdocstrings + TypeDoc
-- **CI:** GitHub Actions
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, Axios, React Router |
+| Backend | FastAPI, SQLModel / SQLAlchemy, Pydantic Settings, Uvicorn |
+| Database | PostgreSQL 16 |
+| Schema lifecycle | Alembic |
+| Containers | Docker + Docker Compose |
+| Docs | MkDocs Material + mkdocstrings + TypeDoc |
+| CI | GitHub Actions |
 
 ---
 
-## Run locally
+# 🛠️ Platform Engineering built into FlashQuest
 
-```bash
-git clone https://github.com/mergemaven11/flashcards.git
-cd flashcards
-docker compose up --build
-```
+| Area | Implementation |
+| --- | --- |
+| **Liveness** | lightweight process/service endpoint |
+| **Readiness** | executes a real database query; returns `503` when PostgreSQL is unavailable |
+| **Request correlation** | caller-provided or generated `X-Request-ID` |
+| **Timing** | `X-Response-Time-Ms` on API responses |
+| **Configuration** | environment-driven DB, CORS, app environment/version, and frontend API URL |
+| **Database lifecycle** | explicit Alembic migrations; startup does not silently mutate schema |
+| **Seed lifecycle** | reproducible, versioned, idempotent 216-card curriculum |
+| **Containers** | React/FastAPI/Postgres Compose stack; API runs as a non-root user |
+| **Dependency ordering** | API waits for PostgreSQL health; web waits for API readiness |
+| **CI/CD** | backend matrix, frontend lint/build, PostgreSQL migration smoke test, image builds |
+| **State boundaries** | durable domain state in PostgreSQL; ephemeral game feedback in the browser session |
 
-Then:
-
-- FlashQuest: `http://localhost:5173`
-- FastAPI docs: `http://localhost:8080/docs`
-- PostgreSQL host port: `5433`
-
-Load the curriculum:
-
-```bash
-docker compose exec api python -m app.seed
-```
-
-Stop:
-
-```bash
-docker compose down
-```
-
-Reset the development database:
-
-```bash
-docker compose down -v
-```
+See [`docs/PLATFORM_ENGINEERING.md`](docs/PLATFORM_ENGINEERING.md) for the deeper architecture and operational design.
 
 ---
 
-## Health and readiness
+# ❤️ Health and readiness
 
 ```text
 GET /health
@@ -269,57 +283,63 @@ GET /health/live
 GET /health/ready
 ```
 
-- `/health` — compatibility health response
-- `/health/live` — process/service liveness + metadata
-- `/health/ready` — executes a database query and returns `503` when PostgreSQL is unavailable
+- `/health` — backwards-compatible lightweight response.
+- `/health/live` — confirms the service process is alive and exposes service metadata.
+- `/health/ready` — verifies the API can query PostgreSQL and returns `503` when it cannot.
 
-Every API response also contains:
+API responses also include:
 
 ```text
 X-Request-ID
 X-Response-Time-Ms
 ```
 
+If the caller supplies `X-Request-ID`, FlashQuest propagates it. Otherwise the API generates one.
+
 ---
 
-## Database migrations
+# 🗃️ Database migrations
 
-Create a migration:
+After starting a **fresh** database, apply migrations before seeding:
 
 ```bash
-docker compose exec api alembic -c /app/alembic.ini revision --autogenerate -m "describe change"
+docker compose exec api \
+  alembic -c /app/alembic.ini upgrade head
 ```
 
-Apply migrations:
+Create a migration after changing models:
 
 ```bash
-docker compose exec api alembic -c /app/alembic.ini upgrade head
+docker compose exec api \
+  alembic -c /app/alembic.ini revision --autogenerate -m "describe change"
 ```
 
 Inspect migration state:
 
 ```bash
-docker compose exec api alembic -c /app/alembic.ini current
+docker compose exec api \
+  alembic -c /app/alembic.ini current
 ```
 
-CI provisions a clean PostgreSQL 16 service and upgrades it to `head` as a migration smoke test.
+CI provisions a clean PostgreSQL 16 instance and runs `alembic upgrade head`, so migration failures are caught before merge.
 
 ---
 
-## CI quality gates
+# ✅ CI quality gates
 
-Pull requests validate:
+Pull requests validate four layers:
 
-1. **Backend — Python 3.11 / 3.12**
-   - bytecode compilation
-   - pytest, including curriculum size/balance/idempotency tests
+1. **Backend — Python 3.11 + 3.12**
+   - compile
+   - pytest
+   - curriculum size/balance/idempotency tests
    - Ruff
-   - Black formatting check
+   - Black check
 2. **Frontend**
-   - `npm ci`
+   - clean `npm ci`
    - ESLint
    - TypeScript + production Vite build
-3. **PostgreSQL migration smoke test**
+3. **Database migrations**
    - clean PostgreSQL 16 service
    - Alembic upgrade to `head`
 4. **Containers**
@@ -327,51 +347,134 @@ Pull requests validate:
    - API image build
    - web image build
 
+CI is intentionally a **quality gate**, not a workflow that silently rewrites contributor code and pushes it back to the branch.
+
 ---
 
-## Repository layout
+# 💻 Development without Docker
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux
+source .venv/bin/activate
+
+python -m pip install -r requirements.txt
+alembic -c alembic.ini upgrade head
+python -m app.seed
+uvicorn app.main:app --reload --port 8080
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+### Quality checks
+
+```bash
+# backend
+cd backend
+python -m pytest -q
+ruff check . --exclude alembic/versions
+black --check . --extend-exclude 'alembic/versions'
+
+# frontend
+cd frontend
+npm run lint
+npm run build
+```
+
+---
+
+# 📁 Repository layout
 
 ```text
 .
-├── .github/workflows/
+├── .github/workflows/          # CI + docs workflows
 ├── backend/
-│   ├── alembic/
+│   ├── alembic/                # schema migrations
 │   ├── app/
 │   │   ├── data/
-│   │   │   ├── platform_engineering_cards.json   # 144 concepts
-│   │   │   └── platform_engineering_labs.json    # 72 break/fix labs
-│   │   ├── seed.py
-│   │   └── ...
-│   ├── tests/
+│   │   │   ├── platform_engineering_cards.json
+│   │   │   └── platform_engineering_labs.json
+│   │   ├── routers/            # cards + study API routes
+│   │   ├── main.py             # FastAPI + operational endpoints
+│   │   ├── models.py           # persistent domain models
+│   │   └── seed.py             # curriculum loader + idempotent seeder
+│   ├── tests/                  # domain, API, operations, seed regression tests
 │   └── Dockerfile
 ├── frontend/
-│   ├── src/pages/
-│   ├── src/api.ts
+│   ├── src/pages/              # Memory Quest, Deck Lab, Deck Map
+│   ├── src/api.ts              # typed API client
 │   └── Dockerfile
-├── docs/
+├── docs/                       # MkDocs + Platform Engineering docs
 ├── docker-compose.yml
 └── mkdocs.yml
 ```
 
 ---
 
-## Portfolio / interview talking points
+# 🎯 Why this belongs in a Platform Engineering portfolio
 
-FlashQuest lets you practice Platform Engineering while also giving you concrete engineering decisions to discuss:
+FlashQuest is both **the project and the practice environment**.
 
-- explain liveness vs readiness;
-- troubleshoot a Kubernetes Service with no endpoints;
-- diagnose CI/local environment differences;
-- recover from dangerous Terraform plans and drift;
-- design safer DB migrations and connection pools;
-- reason about SLOs, error budgets, retries, and graceful degradation;
-- handle secrets and short-lived cloud identity;
-- distinguish mitigation from root-cause analysis during incidents;
-- explain why seed operations and jobs should be idempotent;
-- show how CI validates migrations, frontend, backend, and containers before merge.
+You can use it to prepare answers for questions such as:
 
-**FlashQuest is both the project and the practice environment.**
+- What is the difference between liveness and readiness?
+- Why does this Kubernetes Service have no endpoints?
+- Why does a test pass locally and fail in CI?
+- Why does Terraform want to replace this database?
+- How would you roll out a risky schema migration?
+- Why are DB connections exhausted?
+- How should retries, backoff, jitter, and idempotency interact?
+- How do request IDs help during distributed troubleshooting?
+- What is mitigation versus root-cause analysis during an incident?
+
+At the same time, the repository gives you concrete implementation decisions to discuss:
+
+- dependency-aware startup;
+- reproducible environment data;
+- explicit schema lifecycle management;
+- non-root container execution;
+- CI migration validation;
+- operational endpoint design;
+- durable versus ephemeral state boundaries;
+- automated regression coverage for the study curriculum itself.
 
 ---
 
-**FlashQuest — learn it, break it, fix it, remember it.** ⚡
+## Stop / reset
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+Delete the local PostgreSQL volume and start from scratch:
+
+```bash
+docker compose down -v
+```
+
+Then repeat **start → migrate → seed** from the Quick start section.
+
+---
+
+<div align="center">
+
+### ⚡ FlashQuest
+
+**Learn it. Break it. Fix it. Remember it.**
+
+</div>
