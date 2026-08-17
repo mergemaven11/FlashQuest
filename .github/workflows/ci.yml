@@ -46,7 +46,7 @@ jobs:
       - name: Lint correctness
         run: ruff check app tests --select E4,E7,E9,F
       - name: Format check for new platform code
-        run: black --check app/config.py app/main.py app/seed.py tests/test_operational.py tests/test_seed.py
+        run: black --check app/config.py app/main.py app/seed.py tests/test_health.py tests/test_seed.py
 
   frontend:
     name: Frontend · typecheck/build
