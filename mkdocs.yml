@@ -1,4 +1,5 @@
-site_name: Hiring Flashcards Docs
+site_name: FlashQuest Docs
+site_description: Game-like spaced repetition with production-minded platform engineering.
 theme:
   name: material
 
@@ -7,8 +8,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          # Either of these will work; keeping both is extra-safe on Windows.
-          paths: [ "backend" ]   # adds to sys.path
+          paths: ["backend"]
           setup_commands:
             - import os, sys
             - sys.path.insert(0, os.path.abspath("backend"))
@@ -18,7 +18,8 @@ plugins:
 
 nav:
   - Overview: index.md
+  - Platform Engineering: PLATFORM_ENGINEERING.md
   - Backend:
       - API: backend/api.md
   - Frontend:
-      - Reference: frontend/modules.md   # TypeDoc's main index
+      - Reference: frontend/modules.md
