@@ -82,7 +82,7 @@ Every domain contains **12 concept cards + 6 lab scenarios = 18 challenges**.
 
 ## Concept cards
 
-FlashQuest’s concept cards are written like Platform Engineer interview questions rather than vocabulary definitions.
+These are written more like **Platform Engineer interview questions** than vocabulary definitions.
 
 Examples:
 
@@ -130,7 +130,7 @@ LAB · Incident · Error rate jumps immediately after a deployment.
 What is your first operational move?
 ```
 
-The lab deck includes:
+The lab deck covers work such as:
 
 - setting up services and environments safely;
 - troubleshooting systemd, disk, memory, load, inodes, and file descriptors;
@@ -166,7 +166,7 @@ Automated tests verify:
 
 ---
 
-# 🎮 FlashQuest’s study experience
+# 🎮 Study experience
 
 FlashQuest’s is designed as a **memory quest**, not a plain CRUD dashboard.
 
@@ -220,7 +220,7 @@ Rules:
 ```text
 ┌──────────────────────┐
 │ React + TypeScript   │
-│ FlashQuest’s UI      │
+│ FlashQuest’s frontend │
 └──────────┬───────────┘
            │ HTTP / JSON
            ▼
