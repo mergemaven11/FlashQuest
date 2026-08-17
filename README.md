@@ -1,12 +1,58 @@
 # FlashQuest 🎮🧠
 
-**A game-like spaced-repetition learning app built as a production-minded full-stack platform project.**
+**A game-like Platform Engineering study app built as a production-minded full-stack platform project.**
 
 [![CI](https://github.com/mergemaven11/flashcards/actions/workflows/ci.yml/badge.svg)](https://github.com/mergemaven11/flashcards/actions/workflows/ci.yml)
 [![Docs Deploy](https://github.com/mergemaven11/flashcards/actions/workflows/docs-deploy.yml/badge.svg)](https://github.com/mergemaven11/flashcards/actions/workflows/docs-deploy.yml)
 [![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://flashcards-docs.netlify.app/)
 
-FlashQuest turns flashcard study into a lightweight memory game while keeping durable learning state in a FastAPI/PostgreSQL backend. The repository also demonstrates the operational concerns expected in platform engineering: dependency-aware health checks, migrations, request correlation, container hardening, environment-driven configuration, and multi-layer CI quality gates.
+FlashQuest turns Platform Engineering study into a lightweight memory game while keeping durable learning state in a FastAPI/PostgreSQL backend. The repository also demonstrates the operational concerns expected in platform engineering: dependency-aware health checks, migrations, request correlation, container hardening, environment-driven configuration, and multi-layer CI quality gates.
+
+## Built-in Platform Engineering curriculum
+
+FlashQuest ships with a **144-card Platform Engineering deck** stored in PostgreSQL after seeding. It is intentionally much larger than a demo deck: **12 domains × 12 cards each**.
+
+| Domain | Cards | Example topics |
+| --- | ---: | --- |
+| Linux & OS | 12 | processes vs threads, load average, file descriptors, systemd, `/proc`, OOM, swap, inodes, namespaces |
+| Networking | 12 | TCP, UDP, DNS, CIDR, subnets, NAT, TLS, MTU, reverse proxies, L4/L7 load balancing |
+| Containers | 12 | images, layers, namespaces, cgroups, multi-stage builds, non-root containers, volumes, health checks |
+| Kubernetes | 12 | Pods, Deployments, Services, probes, scheduler, resources, ConfigMaps, Secrets, Ingress, StatefulSets |
+| CI/CD | 12 | CI vs delivery vs deployment, immutable artifacts, canaries, blue-green, gates, provenance, idempotency |
+| Cloud | 12 | shared responsibility, scaling, AZs, object storage, IAM roles, autoscaling, tagging, landing zones |
+| IaC & Terraform | 12 | state, remote state, plans, drift, providers, modules, locking, policy as code, secrets |
+| Observability | 12 | metrics, logs, traces, SLIs, SLOs, error budgets, RED, USE, request IDs, actionable alerts |
+| Databases | 12 | ACID, indexes, keys, migrations, pooling, replication, isolation, deadlocks, PITR |
+| Security | 12 | least privilege, secret rotation, RBAC, SBOMs, image scanning, zero trust, defense in depth |
+| SRE & Reliability | 12 | toil, MTTR, graceful degradation, retries, jitter, circuit breakers, capacity, chaos testing |
+| Incident Response | 12 | triage, incident command, mitigation, RCA, timelines, rollback, runbooks, escalation, postmortems |
+
+The prompts are written as **interview/study questions**, not just vocabulary definitions. Examples:
+
+- `Kubernetes · What is the difference between liveness and readiness probes?`
+- `Terraform · What does drift mean?`
+- `Observability · What is an error budget?`
+- `SRE · What is exponential backoff with jitter?`
+- `Incidents · What should a good postmortem produce?`
+
+### Seed the study database
+
+After the stack is running:
+
+```bash
+docker compose exec api python -m app.seed
+```
+
+The seed is **idempotent**:
+
+- first run inserts the missing Platform Engineering cards;
+- later runs do not duplicate them;
+- missing default-user study progress rows are repaired;
+- the seed test verifies the deck remains exactly **144 unique cards**.
+
+That makes the curriculum itself reproducible infrastructure/data rather than manual database setup.
+
+---
 
 ## What it feels like
 
@@ -35,6 +81,7 @@ Game XP/combo values are intentionally **session-local presentation state**. Dur
 | **Observability** | `X-Request-ID` propagation/generation and response timing headers |
 | **Configuration** | Environment-driven DB, CORS, environment, version, and frontend API settings |
 | **Database lifecycle** | Alembic migrations; app startup does not silently mutate schema |
+| **Seed lifecycle** | Idempotent 144-card curriculum seed with automated regression coverage |
 | **Containers** | Docker Compose for web/API/Postgres; API runs as a non-root user |
 | **Dependency ordering** | Web waits for API readiness; API waits for PostgreSQL health |
 | **CI/CD** | Backend matrix, frontend lint/build, PostgreSQL migration smoke test, container builds |
@@ -111,6 +158,8 @@ Rules:
 - selection prioritizes due cards, then new cards
 - every answer creates a `Review` record for future analytics
 
+With the built-in seed, a fresh environment starts with **144 Platform Engineering challenges** ready to move through this mastery system.
+
 ---
 
 ## Run locally with Docker
@@ -129,7 +178,7 @@ Then open:
 - **FastAPI docs:** `http://localhost:8080/docs`
 - **PostgreSQL host port:** `5433`
 
-Seed example cards:
+Load the Platform Engineering curriculum:
 
 ```bash
 docker compose exec api python -m app.seed
@@ -245,7 +294,7 @@ The pipeline checks:
 
 1. **Backend** on Python 3.11 and 3.12
    - bytecode compilation
-   - pytest
+   - pytest, including the 144-card seed/idempotency tests
    - Ruff
    - Black formatting check
 2. **Frontend**
@@ -280,6 +329,12 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8080
 ```
 
+Seed a local configured database:
+
+```bash
+python -m app.seed
+```
+
 ### Frontend
 
 ```bash
@@ -310,8 +365,10 @@ npm run build
 ├── .github/workflows/       CI + docs deployment
 ├── backend/
 │   ├── alembic/             schema migrations
-│   ├── app/                 FastAPI domain/API code
-│   ├── tests/               backend + operational tests
+│   ├── app/
+│   │   ├── seed.py          144-card Platform Engineering curriculum
+│   │   └── ...              FastAPI domain/API code
+│   ├── tests/               backend + operational + seed tests
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/pages/           Study, Deck Lab, Deck Map
@@ -331,11 +388,13 @@ FlashQuest is useful beyond demonstrating React/FastAPI CRUD. It gives concrete 
 - why liveness and readiness should be different checks;
 - how service dependencies affect startup and orchestration;
 - how to validate DB migrations before deployment;
+- how idempotent seed/data workflows make environments reproducible;
 - why CI should validate contributor code rather than silently rewrite it;
 - how request correlation helps debugging across proxies/services;
 - why containers should run with least privilege;
 - how build-time and runtime configuration differ;
-- how product-facing game state can remain ephemeral while domain state stays durable and auditable.
+- how product-facing game state can remain ephemeral while domain state stays durable and auditable;
+- how the project doubles as a **144-question Platform Engineering interview-prep system** you can actually use while applying.
 
 ---
 
