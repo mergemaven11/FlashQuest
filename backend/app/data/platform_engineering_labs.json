@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "card_count": 72,
+  "domains": [
+    {
+      "name": "Linux & OS Labs",
+      "cards": [
+        {"prompt": "LAB · Linux · A service works manually but fails after reboot. What do you check and fix?", "answer": "Check systemd unit status/logs with systemctl status and journalctl -u, verify the unit is enabled, confirm paths/env vars are absolute and available at boot, fix dependencies/After= ordering if needed, then daemon-reload, enable, restart, and verify."},
+        {"prompt": "LAB · Linux · Disk usage is 100% but du does not explain it. What do you investigate?", "answer": "Check inode exhaustion with df -i and deleted-but-open files with lsof +L1. A process can keep disk blocks allocated after deletion until its file descriptor closes."},
+        {"prompt": "LAB · Linux · A host is slow and load average is high. What is your first triage path?", "answer": "Check uptime/load, CPU/memory with top or vmstat, I/O wait with iostat, run queue and blocked tasks, then inspect the top processes and recent logs. High load does not always mean high CPU; blocked I/O can cause it too."},
+        {"prompt": "LAB · Linux · An app says 'too many open files'. How do you diagnose it?", "answer": "Inspect per-process descriptor count under /proc/<pid>/fd, check ulimit -n and system limits, identify leaks with lsof, then fix the application leak and raise limits only when justified."},
+        {"prompt": "LAB · Linux · A process keeps getting OOM-killed. What do you do?", "answer": "Confirm OOM events in dmesg/journal, inspect process/container memory growth and limits, check swap and host pressure, fix leaks or workload sizing, and set realistic resource limits rather than only increasing memory."},
+        {"prompt": "LAB · Linux · Build a repeatable troubleshooting snapshot for a Linux host. What should it capture?", "answer": "Capture timestamp, uptime/load, CPU/memory, disk/inodes, mounts, top processes, listening ports, failed systemd units, recent kernel/system logs, and relevant app logs. Store it as a script so incident data is consistent."}
+      ]
+    },
+    {
+      "name": "Networking Labs",
+      "cards": [
+        {"prompt": "LAB · Networking · DNS name fails but the service works by IP. What do you check?", "answer": "Check resolver configuration, dig/nslookup response, authoritative record, TTL/caching, search domains, and whether the client is using the expected DNS server. Compare A/AAAA answers and test from the failing network context."},
+        {"prompt": "LAB · Networking · TCP connection times out. How do you isolate where it breaks?", "answer": "Confirm destination/port, test route and DNS, use nc/curl, inspect local firewall and security groups, verify listener with ss/netstat, and use traceroute/tcpdump when needed to see whether SYN/SYN-ACK traffic is flowing."},
+        {"prompt": "LAB · Networking · HTTPS works internally but fails publicly. What is your checklist?", "answer": "Validate public DNS, load balancer/listener, firewall/security groups, TLS certificate/SNI, backend target health, reverse-proxy routing, and whether the app trusts forwarded headers/hostnames."},
+        {"prompt": "LAB · Networking · Users see intermittent 502s behind a reverse proxy. What would you inspect?", "answer": "Inspect proxy upstream errors/timeouts, backend health and saturation, connection reuse, DNS changes, max connections, app latency, and load-balancer target health. Correlate request IDs across proxy and app logs."},
+        {"prompt": "LAB · Networking · Packets larger than a certain size fail. What network issue do you suspect?", "answer": "Suspect MTU/path-MTU problems. Test with ping using DF and varying payload sizes, inspect tunnel/VPN overhead, and align interface or encapsulation MTUs rather than masking the issue with random retries."},
+        {"prompt": "LAB · Networking · Design a quick test to prove whether latency is DNS, TCP, TLS, or server processing.", "answer": "Use curl timing metrics (namelookup, connect, appconnect, starttransfer, total) or equivalent tracing. This separates name resolution, connection establishment, TLS handshake, time-to-first-byte, and total transfer."}
+      ]
+    },
+    {
+      "name": "Container Labs",
+      "cards": [
+        {"prompt": "LAB · Containers · A container exits immediately after start. What do you inspect first?", "answer": "Inspect docker/pod logs and exit code, verify ENTRYPOINT/CMD, required env vars/secrets, mounted files, permissions, and whether the main process stays in the foreground."},
+        {"prompt": "LAB · Containers · The image is 1.5 GB. How would you reduce it?", "answer": "Use multi-stage builds, smaller runtime base images, copy only required artifacts, remove build tools/caches, tighten .dockerignore, and inspect layers with docker history or dive."},
+        {"prompt": "LAB · Containers · The app can write as root but fails as a non-root user. Fix it.", "answer": "Create a dedicated UID/GID, chown required runtime directories during build, use writable mounted paths for mutable data, avoid privileged ports when possible, and keep the final USER non-root."},
+        {"prompt": "LAB · Containers · A container cannot reach another Compose service by localhost. Why?", "answer": "localhost points to the current container. Use the Compose service DNS name and container port, e.g. db:5432, and verify both services share the same network."},
+        {"prompt": "LAB · Containers · Data disappears every time the database container is recreated. What is missing?", "answer": "A persistent volume or bind mount for the database data directory. Define a named volume, mount it to the DB's data path, then verify lifecycle behavior separately from the container lifecycle."},
+        {"prompt": "LAB · Containers · Add a meaningful health check to an API container. What makes it good?", "answer": "Use a fast endpoint that reflects the intended signal, define interval/timeout/retries/start period, and distinguish liveness from readiness. A readiness check should fail if critical dependencies such as the database are unavailable."}
+      ]
+    },
+    {
+      "name": "Kubernetes Labs",
+      "cards": [
+        {"prompt": "LAB · Kubernetes · A Pod is CrashLoopBackOff. Walk through your triage.", "answer": "kubectl describe pod for events/state, kubectl logs --previous for the prior crash, inspect command/env/secrets/config, resources/probes, image pull/runtime errors, then reproduce or patch the root cause."},
+        {"prompt": "LAB · Kubernetes · A Service has no traffic even though Pods are Running. What do you check?", "answer": "Compare Service selector to Pod labels, inspect Endpoints/EndpointSlices, verify targetPort/containerPort, test Pod IP directly, then check readiness probes and NetworkPolicies."},
+        {"prompt": "LAB · Kubernetes · Deployment rollout is stuck. How do you diagnose it?", "answer": "Use kubectl rollout status, describe deployment/replicaset/pods, inspect scheduling and image pull events, readiness failures, resource quotas, and PDB/capacity constraints. Roll back if the new revision is unhealthy and impact is active."},
+        {"prompt": "LAB · Kubernetes · Pods are Pending with 'Insufficient memory'. What are your options?", "answer": "Inspect requests, node allocatable resources, autoscaler status, quotas and affinity constraints. Right-size requests, add/scale nodes, or change scheduling constraints; do not remove requests blindly."},
+        {"prompt": "LAB · Kubernetes · ConfigMap changed but the app still uses old config. Why?", "answer": "Environment-variable values are injected at Pod start and will not refresh automatically. Mounted ConfigMap files may update eventually, but many apps do not reload them. Trigger a rollout/reload mechanism when required."},
+        {"prompt": "LAB · Kubernetes · Design probes for a web API with PostgreSQL. What goes where?", "answer": "Liveness should confirm the process is healthy without depending on Postgres. Readiness should confirm the API can serve traffic, including critical DB connectivity. Startup probe can protect slow boots/migrations from premature liveness failures."}
+      ]
+    },
+    {
+      "name": "CI/CD Labs",
+      "cards": [
+        {"prompt": "LAB · CI/CD · Tests pass locally but fail in CI. What do you compare first?", "answer": "Compare language/runtime versions, dependency lockfiles, environment variables, working directory, filesystem case sensitivity, timezone/locale, service dependencies, and hidden local state. Reproduce in the same container or runner image when possible."},
+        {"prompt": "LAB · CI/CD · A pipeline is slow because every job reinstalls everything. Improve it.", "answer": "Cache immutable dependency downloads keyed by lockfile/runtime, reuse build artifacts between jobs, run independent jobs in parallel, avoid duplicate checkout/build work, and measure before/after durations."},
+        {"prompt": "LAB · CI/CD · A deployment job uses 'latest'. What is wrong and how do you fix it?", "answer": "latest is mutable and weakens traceability/rollback. Build once, assign immutable version/digest, promote that exact artifact through environments, and record provenance."},
+        {"prompt": "LAB · CI/CD · Production deploy is broken after a release. What should the pipeline support immediately?", "answer": "Fast rollback or roll-forward using the previously known-good immutable artifact, health validation, deployment metadata, and clear ownership. Avoid rebuilding old code during rollback."},
+        {"prompt": "LAB · CI/CD · A secret is echoed in logs. What actions do you take?", "answer": "Treat it as compromised: revoke/rotate it, remove/limit log exposure, audit access, fix masking and command usage, then prefer short-lived identity/OIDC over long-lived static credentials."},
+        {"prompt": "LAB · CI/CD · Design quality gates for a full-stack app before container deployment.", "answer": "Run backend tests/lint, frontend lint/typecheck/build, migration smoke test against a real DB, security/dependency checks as appropriate, then container build and smoke/health tests. Deploy only artifacts produced by the validated commit."}
+      ]
+    },
+    {
+      "name": "Cloud Labs",
+      "cards": [
+        {"prompt": "LAB · Cloud · An app in a private subnet needs outbound package downloads but no inbound internet access. What do you design?", "answer": "Route private-subnet outbound traffic through a NAT gateway/instance in a public subnet, keep inbound blocked, and use VPC endpoints/private mirrors where appropriate to reduce NAT dependency/cost."},
+        {"prompt": "LAB · Cloud · A service is publicly reachable when it should not be. What do you inspect?", "answer": "Inspect load balancer exposure, public IPs, security groups/firewalls, route tables, IAM/resource policies, storage ACLs, and DNS. Remove unnecessary public paths and enforce private access plus least privilege."},
+        {"prompt": "LAB · Cloud · Traffic doubled and instances are saturated. What should autoscaling rely on?", "answer": "Use workload-correlated metrics such as request rate, queue depth, CPU/memory where meaningful, set sane min/max/cooldowns, validate launch health, and load test scaling behavior before relying on it."},
+        {"prompt": "LAB · Cloud · You need resilience to an Availability Zone failure. What changes?", "answer": "Distribute compute and load balancing across multiple AZs, use replicated managed data services, avoid AZ-local single points, and test failover. Multi-AZ is different from multi-region."},
+        {"prompt": "LAB · Cloud · Cloud bill spikes overnight. How do you investigate?", "answer": "Break cost down by service/account/region/tag, inspect new resources and usage anomalies, check autoscaling/egress/log ingestion/storage growth, then add budgets/alerts and stronger tagging/ownership controls."},
+        {"prompt": "LAB · Cloud · A workload uses static cloud access keys in CI. Replace them.", "answer": "Use workload identity federation/OIDC from CI to assume a short-lived role with least privilege, scope trust to the repo/branch/environment, and remove/rotate the old static keys."}
+      ]
+    },
+    {
+      "name": "IaC & Terraform Labs",
+      "cards": [
+        {"prompt": "LAB · Terraform · plan wants to recreate a critical database unexpectedly. What do you do?", "answer": "Do not apply. Inspect why the diff is ForceNew, compare state/config/provider versions, confirm import/address changes, review lifecycle implications, and protect critical resources while fixing the model."},
+        {"prompt": "LAB · Terraform · Two engineers apply at the same time. What prevents state corruption?", "answer": "Use a remote backend with state locking/versioning, run plan/apply through serialized automation, and avoid local state for shared environments."},
+        {"prompt": "LAB · Terraform · An existing cloud resource must become managed without recreation. What is the process?", "answer": "Write matching configuration, import the resource into state, run plan, reconcile differences until plan is safe, then manage changes normally."},
+        {"prompt": "LAB · Terraform · Someone manually changed a security group. How do you handle drift?", "answer": "Run plan to detect drift, determine whether the manual change was legitimate, then either codify it in Terraform or revert it through Terraform. Avoid normalizing console-only changes."},
+        {"prompt": "LAB · Terraform · Sensitive credentials are present in tfvars committed to Git. Fix the workflow.", "answer": "Rotate the credentials, remove them from history as appropriate, use a secret manager/CI secret injection or workload identity, mark sensitive outputs, and remember Terraform state can still contain sensitive values."},
+        {"prompt": "LAB · Terraform · Design a reusable module without making it impossible to operate.", "answer": "Expose stable inputs/outputs, keep sensible defaults, avoid huge boolean matrices, document assumptions, version the module, add examples/tests, and keep environment-specific policy outside the reusable core where possible."}
+      ]
+    },
+    {
+      "name": "Observability Labs",
+      "cards": [
+        {"prompt": "LAB · Observability · Latency alert fires. What telemetry do you correlate?", "answer": "Check request rate/errors/latency, traces for slow spans, app/dependency logs, DB/cache latency, saturation metrics, and recent deployments. Use request IDs to connect layers."},
+        {"prompt": "LAB · Observability · CPU is normal but users report slowness. What else could be saturated?", "answer": "Look at I/O wait, memory pressure, thread/connection pools, database connections, queue depth, network latency, lock contention, downstream dependencies, and per-request traces."},
+        {"prompt": "LAB · Observability · Your alert fires constantly but nobody acts on it. Fix the alert.", "answer": "Tie it to user/service impact or an SLO, add an actionable threshold/window, reduce duplicates/noise, include ownership/runbook/context, and downgrade non-actionable signals to dashboards instead of pages."},
+        {"prompt": "LAB · Observability · A request crosses proxy, API, and worker services. How do you trace it without full distributed tracing?", "answer": "Generate or accept a request/correlation ID at ingress, propagate it through headers/messages, include it in structured logs at every hop, and make it searchable centrally."},
+        {"prompt": "LAB · Observability · Define a basic SLO for an HTTP API.", "answer": "Choose an SLI such as successful requests under a latency threshold, define the measurement window and target (for example 99.9% monthly), document exclusions, then derive an error budget and alerts from burn rate."},
+        {"prompt": "LAB · Observability · Logs are costing too much. Reduce cost without going blind.", "answer": "Drop/debug-sample low-value logs, use structured fields instead of duplicate text, set retention tiers, avoid logging high-cardinality payloads/secrets, route audit/security logs separately, and rely on metrics/traces for appropriate questions."}
+      ]
+    },
+    {
+      "name": "Database Labs",
+      "cards": [
+        {"prompt": "LAB · Databases · API errors with 'too many connections'. What do you inspect?", "answer": "Check app pool size, worker count, leaked sessions, DB max_connections, long-running/idle transactions, and traffic. Size pools across all replicas and use a pooler when appropriate rather than simply raising the DB limit."},
+        {"prompt": "LAB · Databases · A query became slow after data growth. What is your process?", "answer": "Capture the query and EXPLAIN/EXPLAIN ANALYZE, inspect indexes/selectivity/row estimates, check locks/I/O/cache, remove N+1 patterns, and validate changes with production-like data."},
+        {"prompt": "LAB · Databases · A migration adds a NOT NULL column to a huge table. How do you reduce risk?", "answer": "Use an expand/contract approach: add nullable/default-compatible schema first, backfill in batches, deploy code that handles both states, validate, then enforce NOT NULL in a later migration."},
+        {"prompt": "LAB · Databases · Primary DB is lost. What determines whether recovery meets expectations?", "answer": "Your tested backups/replication plus defined RPO and RTO. Restore from backup/PITR or fail over to replica according to the runbook, verify consistency, and test recovery regularly."},
+        {"prompt": "LAB · Databases · Transactions are deadlocking. What do you change?", "answer": "Capture deadlock details, make transactions acquire resources in a consistent order, keep transactions short, add suitable indexes, reduce lock scope, and retry only when the operation is safe/idempotent."},
+        {"prompt": "LAB · Databases · Read replicas are stale and a user cannot see their recent write. What design options exist?", "answer": "Route read-after-write to primary for a bounded window, use consistency tokens/session affinity, wait for replica position where supported, or accept/document eventual consistency where the UX allows it."}
+      ]
+    },
+    {
+      "name": "Security Labs",
+      "cards": [
+        {"prompt": "LAB · Security · A container image scanner finds a critical CVE. What is the response?", "answer": "Confirm exploitability/reachability and fixed version, rebuild from patched base/dependencies, retest, deploy the immutable replacement, and track exceptions with owner/expiry when immediate remediation is impossible."},
+        {"prompt": "LAB · Security · An app needs database credentials in Kubernetes. What is a safer setup?", "answer": "Store secrets in a managed secret system or Kubernetes Secret integrated with external secret tooling, restrict RBAC, mount/inject only to the workload, rotate regularly, and avoid baking them into images or Git."},
+        {"prompt": "LAB · Security · CI should deploy only from main to production. How do you enforce it?", "answer": "Use protected environments/branches, OIDC trust conditions scoped to repo/ref/environment, required approvals/checks where appropriate, and a deployment role that only the protected workflow can assume."},
+        {"prompt": "LAB · Security · A developer asks for admin because permissions are blocking them. What is the better response?", "answer": "Identify the exact denied action, grant the narrow role/permission needed, prefer time-bound elevation for exceptional tasks, and preserve auditability instead of defaulting to broad admin access."},
+        {"prompt": "LAB · Security · You discover a secret committed months ago. What do you do first?", "answer": "Rotate/revoke it immediately, audit use, remove it from current code and history as needed, add secret scanning/prevention, and migrate to managed secrets or short-lived identity."},
+        {"prompt": "LAB · Security · Design a basic software supply-chain gate for containers.", "answer": "Pin dependencies/base images, generate an SBOM, scan dependencies/images, build in controlled CI, attach provenance/signatures where supported, verify before deployment, and restrict registries/deploy identities."}
+      ]
+    },
+    {
+      "name": "SRE & Reliability Labs",
+      "cards": [
+        {"prompt": "LAB · SRE · A downstream API is failing and retries are making it worse. What do you change?", "answer": "Use bounded retries only for transient/idempotent operations, exponential backoff with jitter, timeouts, circuit breaking, and load shedding. Retries need a budget so they do not amplify an outage."},
+        {"prompt": "LAB · SRE · One dependency is slow. How can your service degrade gracefully?", "answer": "Set timeouts, serve cached/stale/default data where acceptable, isolate dependency pools, disable noncritical features, queue work asynchronously, and keep core paths available."},
+        {"prompt": "LAB · SRE · Error budget is exhausted. What should happen operationally?", "answer": "Reduce risky feature/change velocity, prioritize reliability work and incident causes, tighten rollout safeguards, and resume normal velocity when reliability returns within policy."},
+        {"prompt": "LAB · SRE · A cron-like job occasionally runs twice. How do you make it safe?", "answer": "Design it to be idempotent using stable operation keys, upserts/conditional writes, deduplication/locking where needed, and checkpoint progress so duplicate execution does not duplicate side effects."},
+        {"prompt": "LAB · SRE · You need to test whether the service survives instance loss. What kind of exercise do you run?", "answer": "Run a controlled failure/chaos experiment with a hypothesis, blast-radius limits, monitoring, abort criteria, and recovery verification. Start small, e.g. terminate one replica and observe traffic shifting."},
+        {"prompt": "LAB · SRE · Queue depth is growing faster than workers can drain it. What do you investigate?", "answer": "Measure arrival vs service rate, worker concurrency/saturation, downstream latency, poison messages/retries, autoscaling signals, and backlog age. Scale or optimize while protecting dependencies from overload."}
+      ]
+    },
+    {
+      "name": "Incident Response Labs",
+      "cards": [
+        {"prompt": "LAB · Incident · Error rate jumps immediately after a deployment. What is your first operational move?", "answer": "Confirm correlation and user impact, stop further rollout, roll back or disable the risky change if safe, then investigate. Restore service before doing deep root-cause analysis."},
+        {"prompt": "LAB · Incident · Multiple engineers are debugging but nobody coordinates. What role is missing?", "answer": "An incident commander/coordinator. Assign clear roles for command, operations, communications, and subject-matter investigation so responders do not duplicate or conflict."},
+        {"prompt": "LAB · Incident · Customers need an update but root cause is unknown. What do you communicate?", "answer": "State known impact, affected scope, mitigation/work underway, and next update time. Do not invent a root cause. Separate facts from hypotheses."},
+        {"prompt": "LAB · Incident · A mitigation works but you are unsure why. Do you revert it to test?", "answer": "Not during active impact unless necessary. Preserve the stable state, document exactly what changed, collect evidence, then reproduce/test hypotheses in a safer environment after service is restored."},
+        {"prompt": "LAB · Incident · Build a useful incident timeline. What events belong in it?", "answer": "Detection, first symptoms, alerts, deployments/config changes, key hypotheses, mitigation actions, decision points, customer communications, recovery, and verification—with timestamps and sources."},
+        {"prompt": "LAB · Incident · What turns a postmortem action item into real reliability improvement?", "answer": "Give it a specific owner, priority, due date, measurable outcome, and tracking mechanism. Prefer systemic fixes—automation, guardrails, tests, observability—over vague 'be more careful' actions."}
+      ]
+    }
+  ]
+}
