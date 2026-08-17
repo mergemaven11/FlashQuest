@@ -1,4 +1,5 @@
 """Tests for the built-in Platform Engineering concept and lab decks."""
+
 from sqlmodel import select
 
 from app.models import Card, UserCard
@@ -15,15 +16,13 @@ from app.seed import (
 def test_platform_deck_has_216_unique_balanced_cards():
     assert len(PLATFORM_ENGINEERING_DECK_BY_DOMAIN) == 12
     assert all(
-        len(cards) == 12
-        for cards in PLATFORM_ENGINEERING_DECK_BY_DOMAIN.values()
+        len(cards) == 12 for cards in PLATFORM_ENGINEERING_DECK_BY_DOMAIN.values()
     )
     assert len(PLATFORM_ENGINEERING_CONCEPT_DECK) == 144
 
     assert len(PLATFORM_ENGINEERING_LABS_BY_DOMAIN) == 12
     assert all(
-        len(cards) == 6
-        for cards in PLATFORM_ENGINEERING_LABS_BY_DOMAIN.values()
+        len(cards) == 6 for cards in PLATFORM_ENGINEERING_LABS_BY_DOMAIN.values()
     )
     assert len(PLATFORM_ENGINEERING_LAB_DECK) == 72
 
@@ -37,7 +36,9 @@ def test_lab_cards_are_scenario_driven():
     assert all(prompt.startswith("LAB ·") for prompt in prompts)
     assert any("broken" in prompt.lower() for prompt in prompts)
     assert any("fix" in prompt.lower() for prompt in prompts)
-    assert any("set" in prompt.lower() or "design" in prompt.lower() for prompt in prompts)
+    assert any(
+        "set" in prompt.lower() or "design" in prompt.lower() for prompt in prompts
+    )
 
 
 def test_seed_platform_deck_is_idempotent(sqlite_session):
