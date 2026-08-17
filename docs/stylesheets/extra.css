@@ -1,0 +1,54 @@
+:root {
+  --fq-glow: 0 0 32px rgba(34, 211, 238, 0.12);
+}
+
+.md-header,
+.md-tabs {
+  backdrop-filter: blur(14px);
+}
+
+.md-main__inner {
+  margin-top: 1.25rem;
+}
+
+.md-typeset h1 {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.md-typeset h2 {
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.md-typeset .fq-hero {
+  border: 1px solid color-mix(in srgb, var(--md-accent-fg-color) 28%, transparent);
+  border-radius: 1rem;
+  padding: 1.25rem 1.4rem;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.13), rgba(34, 211, 238, 0.08));
+  box-shadow: var(--fq-glow);
+}
+
+.md-typeset .fq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.md-typeset .fq-card {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.85rem;
+  padding: 0.95rem 1rem;
+  background: var(--md-code-bg-color);
+}
+
+.md-typeset .fq-card strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 1.05rem;
+}
+
+.md-typeset code {
+  border-radius: 0.35rem;
+}
