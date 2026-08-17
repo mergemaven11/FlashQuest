@@ -1,55 +1,72 @@
 # FlashQuest’s 🎮🧠
 
-**Learn it. Break it. Fix it. Remember it.**
+<div class="fq-hero" markdown>
 
-FlashQuest’s is a game-like **Platform Engineering study and troubleshooting app** built with React, FastAPI, PostgreSQL, Alembic, and Docker.
+## Learn it. Break it. Fix it. Remember it.
 
-It ships with a built-in **216-card Platform Engineering curriculum**:
+**FlashQuest’s** is a game-like Platform Engineering study and troubleshooting environment built with React, FastAPI, PostgreSQL, Alembic, Docker, and GitHub Actions.
 
-- **144 concept / interview cards** for core knowledge;
-- **72 hands-on lab / break-fix cards** for operational scenarios;
-- **12 domains** spanning Linux, networking, containers, Kubernetes, CI/CD, cloud, Terraform/IaC, observability, databases, security, SRE/reliability, and incident response;
-- PostgreSQL-backed spaced-repetition progress across **12 mastery levels**;
-- session XP, combos, accuracy, checkpoints, and mastery feedback.
+It combines a **216-card curriculum** with hands-on break/fix scenarios and a real full-stack application you can inspect while you study.
 
-The repository is also a Platform Engineering portfolio project: dependency-aware readiness, Alembic migrations, request correlation, non-root containers, environment-driven configuration, PostgreSQL migration testing, and CI quality gates.
+</div>
+
+<div class="fq-grid" markdown>
+
+<div class="fq-card" markdown>
+**144 concept cards**
+
+Interview-style questions covering the systems Platform Engineers work with.
+</div>
+
+<div class="fq-card" markdown>
+**72 break/fix labs**
+
+Operational scenarios: diagnose the symptoms, choose the next signal, and recover safely.
+</div>
+
+<div class="fq-card" markdown>
+**12 domains**
+
+Linux through incident response, with 18 challenges in every domain.
+</div>
+
+<div class="fq-card" markdown>
+**12 mastery levels**
+
+PostgreSQL-backed spaced repetition tracks durable progress while session XP keeps studying fun.
+</div>
+
+</div>
+
+## 🧭 Pick your path
+
+=== "Study"
+
+    Start with the [Platform Engineering curriculum](CURRICULUM.md), then use the [Break/Fix Labs](LABS.md) to practice applying the concepts under pressure.
+
+=== "Build"
+
+    Read the [Platform Engineering architecture](PLATFORM_ENGINEERING.md) to see how FlashQuest’s handles health checks, migrations, configuration, containers, and CI quality gates.
+
+=== "Operate"
+
+    Use the [Operations & Deployment guide](OPERATIONS.md) for startup order, diagnostics, database lifecycle, Docker commands, and deployment boundaries.
+
+=== "Inspect the code"
+
+    Jump into the generated [Backend API](backend/api.md) or [Frontend reference](frontend/modules.md).
 
 ---
 
-## 🧪 Learn it, then fix it
+## ⚡ Quick start
 
-Concept cards ask questions such as:
+A fresh environment should come up in this order:
 
-```text
-Kubernetes · What is the difference between liveness and readiness probes?
-Terraform · What does drift mean?
-Observability · What is an error budget?
-```
-
-Lab cards put you into operational situations:
-
-```text
-LAB · Kubernetes · A Service has no traffic even though Pods are Running.
-What do you check?
-
-LAB · CI/CD · Tests pass locally but fail in CI.
-What do you compare first?
-
-LAB · Databases · The API reports "too many connections".
-What do you inspect and fix?
-```
-
-The curriculum is versioned as data under `backend/app/data/`, and the seed process is idempotent so curriculum updates can be loaded without duplicating existing cards or study-progress rows.
-
----
-
-## 🚀 Quick start
-
-A fresh environment should be started in this order: **start → migrate → seed → verify**.
+**start → migrate → seed → verify**
 
 ```bash
-git clone https://github.com/mergemaven11/flashcards.git
-cd flashcards
+git clone https://github.com/mergemaven11/FlashQuest.git
+cd FlashQuest
 
 docker compose up --build -d
 
@@ -59,71 +76,89 @@ docker compose exec api \
 docker compose exec api python -m app.seed
 ```
 
-Open:
-
-- **FlashQuest’s:** `http://localhost:5173`
-- **FastAPI / OpenAPI:** `http://localhost:8080/docs`
-- **Readiness:** `http://localhost:8080/health/ready`
-
-Verify:
+Verify the runtime:
 
 ```bash
 curl http://localhost:8080/health/live
 curl http://localhost:8080/health/ready
 ```
 
+Then open:
+
+- **FlashQuest’s game UI:** `http://localhost:5173`
+- **FastAPI / OpenAPI:** `http://localhost:8080/docs`
+- **Readiness endpoint:** `http://localhost:8080/health/ready`
+
+!!! tip "Seeding is safe to repeat"
+    The built-in curriculum seeder is idempotent. Existing prompts are reused, new curriculum cards are inserted, and missing default-user progress rows are repaired without duplicating the deck.
+
+---
+
+## 📚 What you study
+
+Every domain contains **12 concept cards + 6 practical lab scenarios**.
+
+| Domain | Concepts | Labs | Total |
+| --- | ---: | ---: | ---: |
+| Linux & OS | 12 | 6 | 18 |
+| Networking | 12 | 6 | 18 |
+| Containers | 12 | 6 | 18 |
+| Kubernetes | 12 | 6 | 18 |
+| CI/CD | 12 | 6 | 18 |
+| Cloud | 12 | 6 | 18 |
+| IaC & Terraform | 12 | 6 | 18 |
+| Observability | 12 | 6 | 18 |
+| Databases | 12 | 6 | 18 |
+| Security | 12 | 6 | 18 |
+| SRE & Reliability | 12 | 6 | 18 |
+| Incident Response | 12 | 6 | 18 |
+| **Total** | **144** | **72** | **216** |
+
+The curriculum itself is versioned under:
+
+```text
+backend/app/data/
+├── platform_engineering_cards.json
+└── platform_engineering_labs.json
+```
+
+[Explore the full curriculum →](CURRICULUM.md){ .md-button .md-button--primary }
+[Try the lab format →](LABS.md){ .md-button }
+
 ---
 
 ## 🏗️ Runtime architecture
 
 ```text
+Browser
+  │
+  ▼
 React / TypeScript SPA
-        |
-        | HTTP / JSON
-        v
-FastAPI application
-        |
-        | SQLModel / SQLAlchemy
-        v
+  │ HTTP / JSON
+  ▼
+FastAPI
+  │ SQLModel / SQLAlchemy
+  ▼
 PostgreSQL 16
-        ^
-        |
-Alembic migrations
+  ▲
+  │ schema lifecycle
+Alembic
 ```
 
-Local Docker Compose keeps those same service boundaries: web, API, and database.
+FlashQuest’s deliberately separates **application liveness** from **dependency readiness**, validates migrations in CI, runs the API container as a non-root user, and keeps durable study state in PostgreSQL while browser-session game feedback remains ephemeral.
+
+[Read the architecture decisions →](PLATFORM_ENGINEERING.md){ .md-button }
 
 ---
 
-## ❤️ Operational model
+## ✅ Quality gates
 
-FlashQuest’s separates liveness from readiness:
+Changes are validated across the same boundaries the application depends on:
 
-- `GET /health` — backwards-compatible lightweight health response;
-- `GET /health/live` — confirms the API process is alive and returns service metadata;
-- `GET /health/ready` — executes a database query and returns `503` when PostgreSQL is unavailable.
+1. **Backend** — Python 3.11/3.12, compile, pytest, Ruff correctness, Black formatting.
+2. **Frontend** — clean install, ESLint, TypeScript, Vite production build.
+3. **Database** — clean PostgreSQL 16 + Alembic upgrade to `head`.
+4. **Containers** — Compose validation plus API and web image builds.
+5. **Documentation** — MkDocs + TypeDoc build checks.
 
-API responses also include `X-Request-ID` and `X-Response-Time-Ms` for request correlation and basic latency visibility.
-
----
-
-## ✅ CI quality gates
-
-Pull requests validate:
-
-1. backend tests on Python 3.11 and 3.12;
-2. Ruff correctness checks and Black formatting checks;
-3. frontend ESLint and TypeScript/Vite production builds;
-4. Alembic migration against clean PostgreSQL 16;
-5. Docker Compose configuration plus API and web image builds;
-6. MkDocs / TypeDoc documentation build.
-
----
-
-## 🧭 Docs map
-
-- [Platform Engineering design](PLATFORM_ENGINEERING.md)
-- [Backend API reference](backend/api.md)
-- [Frontend reference](frontend/modules.md)
-
-The deeper Platform Engineering page explains health semantics, configuration, failure boundaries, CI design, and portfolio/interview talking points.
+That gives FlashQuest’s two jobs at once: **help you study Platform Engineering and give you a Platform Engineering project to talk about.**
