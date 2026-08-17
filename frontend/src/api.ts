@@ -1,7 +1,7 @@
 // frontend/src/api.ts
 /**
  * Minimal API client using axios with friendly errors + health check.
- * Base URL comes from Vite env (VITE_API_URL) or defaults to localhost.
+ * Base URL comes from Vite env, then a production-safe fallback, then localhost.
  *
  * Also exports spaced-repetition helpers to display bin timers in the UI.
  */
@@ -14,33 +14,31 @@ import type {
   CreateCardPayload,
 } from "./types";
 
+export type StudyTrack = "mixed" | "concept" | "lab";
+
 /** Map of bin -> delay in milliseconds (must mirror backend schedule). */
 export const BIN_DELAYS: Record<number, number> = {
-  0: 0, // new
-  1: 5_000, // 5s
-  2: 30_000, // 30s
-  3: 5 * 60_000, // 5m
-  4: 30 * 60_000, // 30m
-  5: 2 * 60 * 60_000, // 2h
-  6: 6 * 60 * 60_000, // 6h
-  7: 24 * 60 * 60_000, // 1d
-  8: 2 * 24 * 60 * 60_000, // 2d
-  9: 4 * 24 * 60 * 60_000, // 4d
-  10: 7 * 24 * 60 * 60_000, // 7d (~1w)
-  11: 14 * 24 * 60 * 60_000, // 14d
+  0: 0,
+  1: 5_000,
+  2: 25_000,
+  3: 2 * 60_000,
+  4: 10 * 60_000,
+  5: 60 * 60_000,
+  6: 5 * 60 * 60_000,
+  7: 24 * 60 * 60_000,
+  8: 5 * 24 * 60 * 60_000,
+  9: 25 * 24 * 60 * 60_000,
+  10: 120 * 24 * 60 * 60_000,
+  11: 0,
 };
 
-/**
- * Human-friendly label for a bin’s delay (e.g., "5s", "30m", "2h", "1d").
- * Falls back to "~1m" if bin is unknown.
- */
 export function binLabel(bin: number): string {
+  if (bin === 11) return "mastered";
   const ms = BIN_DELAYS[bin];
   if (ms == null) return "~1m";
   return formatDelay(ms);
 }
 
-/** Format milliseconds into a short relative label (s/m/h/d). */
 export function formatDelay(ms: number): string {
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -52,12 +50,18 @@ export function formatDelay(ms: number): string {
   return `${d}d`;
 }
 
-/** Resolve API base URL for diagnostics. */
+/** Resolve API base URL for diagnostics and production. */
 export function apiBaseURL(): string {
-  return import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+
+  if (typeof window !== "undefined" && window.location.hostname.endsWith("netlify.app")) {
+    return "https://flashcards-tobias.fly.dev";
+  }
+
+  return "http://localhost:8080";
 }
 
-/** Axios instance with sane timeout and JSON defaults. */
 export const api = axios.create({
   baseURL: apiBaseURL(),
   timeout: 12_000,
@@ -65,11 +69,9 @@ export const api = axios.create({
   responseType: "json",
 });
 
-/** Log useful info on API failures to help debug quickly in the console. */
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    // Avoid noisy logs for cancellations
     if (axios.isCancel?.(err)) return Promise.reject(err);
 
     console.error("API error:", {
@@ -84,14 +86,11 @@ api.interceptors.response.use(
   }
 );
 
-/** Convert Axios/Network errors to readable messages for the UI. */
 function normalizeError(err: unknown): Error {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status;
-    const detail =
-      (err.response?.data as any)?.detail ??
-      err.response?.statusText ??
-      err.message;
+    const responseData = err.response?.data as { detail?: unknown } | undefined;
+    const detail = responseData?.detail ?? err.response?.statusText ?? err.message;
     return new Error(
       status ? `HTTP ${status}: ${String(detail)}` : `Network: ${String(detail)}`
     );
@@ -99,10 +98,6 @@ function normalizeError(err: unknown): Error {
   return err instanceof Error ? err : new Error("Unknown error");
 }
 
-/**
- * Check API health.
- * @returns `true` if `/health` responds `{ ok: true }`, otherwise `false`.
- */
 export async function checkApi(): Promise<boolean> {
   try {
     const { data } = await api.get<{ ok: boolean }>("/health");
@@ -112,29 +107,19 @@ export async function checkApi(): Promise<boolean> {
   }
 }
 
-/**
- * Get the next study item or a status if none are due.
- * @returns Discriminated union with `status: "ok" | "temporarily_done" | "permanently_done"`.
- */
-export async function getStudyNext(): Promise<StudyNext> {
+export async function getStudyNext(track: StudyTrack = "mixed"): Promise<StudyNext> {
   try {
-    const { data } = await api.get<StudyNext>("/study/next");
+    const { data } = await api.get<StudyNext>("/study/next", {
+      params: { track },
+    });
     return data;
   } catch (e) {
     throw normalizeError(e);
   }
 }
 
-/** Response shape for /study/answer. */
 export type AnswerResponse = { ok: boolean; to_bin: number; status: string };
 
-/**
- * Submit an answer for a card.
- *
- * Overloads:
- * - `postStudyAnswer(123, "correct")`
- * - `postStudyAnswer({ cardId: 123, result: "correct" })`
- */
 export function postStudyAnswer(
   cardId: number,
   result: "correct" | "wrong"
@@ -164,10 +149,6 @@ export async function postStudyAnswer(
   }
 }
 
-/**
- * Create a new card (word + definition).
- * @param payload - The card data.
- */
 export async function createCard(payload: CreateCardPayload): Promise<CardRead> {
   try {
     const { data } = await api.post<CardRead>("/cards", payload);
@@ -177,10 +158,6 @@ export async function createCard(payload: CreateCardPayload): Promise<CardRead> 
   }
 }
 
-/**
- * List admin cards (with bin/status). Optional search query.
- * @param q - Case-insensitive match on word/definition.
- */
 export async function listAdminCards(q?: string): Promise<CardAdminRead[]> {
   try {
     const { data } = await api.get<CardAdminRead[]>("/cards/admin", {
@@ -192,13 +169,6 @@ export async function listAdminCards(q?: string): Promise<CardAdminRead[]> {
   }
 }
 
-/**
- * Reset ALL progress for the default user on the backend.
- * - Ensures a UserCard exists for every Card
- * - Deletes all Review rows
- * - Resets bin/wrong_count/next_review_at/status on UserCard
- * @returns counts of affected rows
- */
 export async function adminReset(): Promise<{
   ok: boolean;
   inserted_usercards: number;
@@ -218,11 +188,6 @@ export async function adminReset(): Promise<{
   }
 }
 
-/**
- * Delete a card by ID.
- * Also removes associated per-user progress/reviews if your backend cascades.
- * @throws Error with readable message when the API rejects the request.
- */
 export async function deleteCard(id: number): Promise<void> {
   try {
     await api.delete(`/cards/${id}`);
