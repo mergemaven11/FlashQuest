@@ -13,6 +13,7 @@ from ..models import UserCard, Card, Review
 
 router = APIRouter(prefix="/study", tags=["study"])
 DEFAULT_USER_ID = 1
+VALID_TRACKS = {"mixed", "concept", "lab"}
 
 
 # ---------- Time helpers (timezone-aware UTC) ----------
@@ -49,10 +50,22 @@ def _next_review_at_from_bin(b: int) -> Optional[datetime]:
     return None if delay is None else _now_utc() + delay
 
 
+def _track_clause(track: str) -> Any | None:
+    """Return a SQL clause that limits study to concepts or break/fix labs."""
+    word = cast(Any, Card.word)
+    if track == "lab":
+        return word.like("LAB ·%")
+    if track == "concept":
+        return ~word.like("LAB ·%")
+    return None
+
+
 # ---------- Selection logic ----------
-def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
+def _select_next_card_pair(
+    session: Session, track: str = "mixed"
+) -> Optional[tuple[Card, UserCard]]:
     """
-    Select the next card for the default user to study.
+    Select the next card for the default user and requested study track.
 
     Selection priority:
       1) Any due active card (next_review_at <= now), preferring:
@@ -63,43 +76,43 @@ def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
          - bin = 0 and next_review_at IS NULL
          - Ordered by created_at DESC, then Card.id DESC
     """
-    # Cast ORM attributes to SQL expressions for mypy
     nr = cast(Any, UserCard.next_review_at)
     b = cast(Any, UserCard.bin)
     cid = cast(Any, Card.id)
     created = cast(Any, Card.created_at)
     uc_card_id = cast(Any, UserCard.card_id)
+    track_clause = _track_clause(track)
 
-    # 1) due active card(s): prefer higher bin, then earliest due
+    due_conditions: list[Any] = [
+        UserCard.user_id == DEFAULT_USER_ID,
+        UserCard.status == "active",
+        and_(nr.is_not(None), nr <= func.now()),
+    ]
+    new_conditions: list[Any] = [
+        UserCard.user_id == DEFAULT_USER_ID,
+        UserCard.status == "active",
+        cast(Any, UserCard.bin) == 0,
+        nr.is_(None),
+    ]
+    if track_clause is not None:
+        due_conditions.append(track_clause)
+        new_conditions.append(track_clause)
+
     due_stmt = (
         select(Card, UserCard)
-        .join(UserCard, uc_card_id == cid)  # casted ON clause
-        .where(
-            UserCard.user_id == DEFAULT_USER_ID,
-            UserCard.status == "active",
-            and_(nr.is_not(None), nr <= func.now()),
-        )
-        .order_by(
-            desc(b),  # prefer higher bin
-            asc(nr),  # then earliest due
-            asc(cid),  # stable tiebreaker
-        )
+        .join(UserCard, uc_card_id == cid)
+        .where(*due_conditions)
+        .order_by(desc(b), asc(nr), asc(cid))
         .limit(1)
     )
     due_row = session.exec(due_stmt).first()
     if due_row:
-        return due_row  # (Card, UserCard)
+        return due_row
 
-    # 2) newest "new" bin-0 card (next_review_at is NULL)
     new_stmt = (
         select(Card, UserCard)
-        .join(UserCard, uc_card_id == cid)  # casted ON clause
-        .where(
-            UserCard.user_id == DEFAULT_USER_ID,
-            UserCard.status == "active",
-            cast(Any, UserCard.bin) == 0,  # cast to avoid bool typing
-            nr.is_(None),
-        )
+        .join(UserCard, uc_card_id == cid)
+        .where(*new_conditions)
         .order_by(desc(created), desc(cid))
         .limit(1)
     )
@@ -112,33 +125,44 @@ def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
 
 # --- Public function expected by tests ---
 def select_next_card(session: Session) -> Optional[Card]:
-    """Return only the Card (or None) using the same priority as _select_next_card_pair."""
+    """Return only the Card (or None) using the mixed-deck priority."""
     pair = _select_next_card_pair(session)
     return pair[0] if pair else None
 
 
 # ---------- Routes ----------
 @router.get("/next")
-def study_next(session: Session = Depends(get_session)) -> dict[str, Any]:
-    """
-    Return the next card to study for the default user.
+def study_next(
+    track: str = Query(
+        "mixed",
+        description="Study track: mixed, concept, or lab",
+        pattern="^(mixed|concept|lab)$",
+    ),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Return the next due/new card for the selected study track."""
+    if track not in VALID_TRACKS:
+        raise HTTPException(status_code=422, detail="invalid study track")
 
-    - If there are no ACTIVE cards at all -> {"status":"permanently_done"}
-    - Else if there are ACTIVE cards but none due/new -> {"status":"temporarily_done"}
-    - Else -> {"status":"ok", "card": {...}}
-    """
-    # 0) If there are no ACTIVE cards, we are permanently done
+    cid = cast(Any, Card.id)
+    uc_card_id = cast(Any, UserCard.card_id)
+    active_conditions: list[Any] = [
+        UserCard.user_id == DEFAULT_USER_ID,
+        UserCard.status == "active",
+    ]
+    track_clause = _track_clause(track)
+    if track_clause is not None:
+        active_conditions.append(track_clause)
+
     has_active = session.exec(
-        select(UserCard.id).where(
-            UserCard.user_id == DEFAULT_USER_ID,
-            UserCard.status == "active",
-        )
+        select(UserCard.id)
+        .join(Card, uc_card_id == cid)
+        .where(*active_conditions)
     ).first()
     if has_active is None:
         return {"status": "permanently_done"}
 
-    # 1) Try to pick a due/new active card
-    pair = _select_next_card_pair(session)
+    pair = _select_next_card_pair(session, track)
     if pair:
         card, uc = pair
         return {
@@ -152,7 +176,6 @@ def study_next(session: Session = Depends(get_session)) -> dict[str, Any]:
             },
         }
 
-    # 2) We have active cards but none are due/new right now
     return {"status": "temporarily_done"}
 
 
@@ -196,10 +219,8 @@ def submit_answer(
         if uc.wrong_count >= 10:
             uc.status = "hard_to_remember"
 
-    # Compute next review time per spec (bin 11 => never/None)
     uc.next_review_at = _next_review_at_from_bin(uc.bin)
 
-    # If card reached bin 11, mark never and clear next review (per spec)
     if uc.bin == 11:
         uc.status = "never"
         uc.next_review_at = None
