@@ -1,268 +1,484 @@
-# Hiring Flashcards
+# FlashQuest’s 🎮🧠
 
-MVP web app implementing **spaced repetition** for vocabulary study.
-**React (Vite) SPA** + **FastAPI** API + **PostgreSQL**, packaged with **Docker Compose** for easy run.
+**Learn it. Break it. Fix it. Remember it.**
 
-> **Repo name:** `hiring-[firstname]-[lastname]-flashcards` (private)
+FlashQuest’s is a game-like **Platform Engineering study + troubleshooting app** built with React, FastAPI, PostgreSQL, Alembic, and Docker.
 
+[![CI](https://github.com/mergemaven11/flashcards/actions/workflows/ci.yml/badge.svg)](https://github.com/mergemaven11/flashcards/actions/workflows/ci.yml)
+[![Docs Deploy](https://github.com/mergemaven11/flashcards/actions/workflows/docs-deploy.yml/badge.svg)](https://github.com/mergemaven11/flashcards/actions/workflows/docs-deploy.yml)
 [![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://flashcards-docs.netlify.app/)
-[Docs](https://flashcards-docs.netlify.app/ "Open the documentation")
 
+FlashQuest’s ships with **216 built-in Platform Engineering challenges**:
 
----
-![CI](https://github.com/mergemaven11/hiring-tobias-scott-flashcards/actions/workflows/ci.yml/badge.svg)
-[![Docs Deploy](https://github.com/mergemaven11/hiring-tobias-scott-flashcards/actions/workflows/docs-deploy.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/docs-deploy.yml)
+- **144 concept / interview cards** — understand the systems.
+- **72 hands-on lab / break-fix cards** — diagnose, design, and fix the systems.
+- **12 domains** — Linux through incident response.
+- **PostgreSQL-backed progress** — study state survives browser sessions.
+- **Game feedback** — XP, levels, combos, accuracy, mastery, and deck progression.
 
-
-## Overview
-
-- Create flashcards (word + definition)
-- Study loop: show word → reveal definition → “I got it” / “I didn’t”
-- Cards progress through **12 bins (0–11)**; delays increase per bin
-- Lifetime wrong ≥ 10 ⇒ **hard_to_remember** (never shown again)
-- If all cards are “never” or “hard_to_remember” ⇒ permanently done
-
-### Spaced Repetition Bins
-
-| Bin | Delay (approx) |
-|-----|-----------------|
-| 0   | new (no delay)  |
-| 1   | 5s              |
-| 2   | 25s             |
-| 3   | 2m              |
-| 4   | 10m             |
-| 5   | 1h              |
-| 6   | 5h              |
-| 7   | 1d              |
-| 8   | 5d              |
-| 9   | 25d             |
-| 10  | ~4mo            |
-| 11  | never           |
-
-**Rules:**
-
-- Correct ⇒ `bin = min(bin+1, 11)`
-- Wrong ⇒ `bin = 1` and `wrong_count += 1`
-- `wrong_count >= 10` ⇒ status = `hard_to_remember`
-- Selection order: due cards (highest bin first) → new cards (bin 0) → status messages
+The application itself is also a Platform Engineering portfolio project: dependency-aware health checks, explicit Alembic migrations, request correlation, non-root containers, environment-driven configuration, PostgreSQL migration testing, and CI quality gates.
 
 ---
 
-## Tech Stack
+## 🚀 Quick start
 
-- **Frontend:** React (Vite, TypeScript), Axios, React Router, served by Nginx
-- **Backend:** FastAPI, SQLModel/SQLAlchemy, Pydantic Settings, Uvicorn
-- **DB:** PostgreSQL
-- **Containers:** Dockerfiles for web & api + `docker-compose.yml`
-- **Docs:** Google-style docstrings throughout backend
+A fresh environment should be brought up in this order: **start → migrate → seed → verify**.
 
-> If frameworks/templates or AI assistance were used: this project was built with React + FastAPI, and an AI assistant was used to accelerate scaffolding and documentation.
-
----
-
-## Project Structure
-
-```
-.
-├─ docker-compose.yml
-├─ backend/
-│  ├─ Dockerfile
-│  ├─ requirements.txt
-│  ├─ .dockerignore
-│  ├─ .env.example
-│  └─ app/
-│     ├─ main.py
-│     ├─ config.py
-│     ├─ db.py
-│     ├─ models.py
-│     ├─ crud.py
-│     ├─ routers/
-│     │  ├─ cards.py
-│     │  └─ study.py
-│     └─ seed.py
-└─ frontend/
-   ├─ Dockerfile
-   ├─ .dockerignore
-   ├─ nginx.conf
-   ├─ .env.example
-   └─ src/...
-```
-
----
-
-## Run Locally (Docker)
-
-> Requires Docker Desktop (Compose v2).
-> The API URL is baked into the SPA at build time via a build arg.
-
-### Database Migrations (Alembic)
-Inside Docker:
 ```bash
-docker compose exec api alembic -c /app/alembic.ini revision --autogenerate -m "desc"
-docker compose exec api alembic -c /app/alembic.ini upgrade head
-docker compose exec api alembic -c /app/alembic.ini current
+git clone https://github.com/mergemaven11/flashcards.git
+cd flashcards
+
+docker compose up --build -d
+
+docker compose exec api \
+  alembic -c /app/alembic.ini upgrade head
+
+docker compose exec api python -m app.seed
 ```
 
-### 6) Tips for future model changes
-- Make your model change (add nullable column first, if possible).
-- Generate + apply:
-  ```bat
-  docker compose exec api alembic -c /app/alembic.ini revision --autogenerate -m "add <field>"
-  docker compose exec api alembic -c /app/alembic.ini upgrade head
----
+Open:
 
-1. **Start everything**
-   ```bash
-   docker compose up --build
-   ```
-   - API docs: http://localhost:8080/docs
-   - Web app:  http://localhost:5173
+- **FlashQuest’s:** `http://localhost:5173`
+- **FastAPI / OpenAPI:** `http://localhost:8080/docs`
+- **API readiness:** `http://localhost:8080/health/ready`
+- **PostgreSQL host port:** `5433`
 
-2. **Seed a few cards (one-off)**
-   ```bash
-   docker compose exec api python -m app.seed
-   ```
+Verify the stack:
 
-3. **Stop/clean**
-   ```bash
-   docker compose down
-   # or remove volumes too:
-   docker compose down -v
-   ```
-
-> If you already have Postgres on host port 5432, change the compose mapping to `5433:5432` under the `db` service.
-
----
-
-## Environment Variables
-
-### Frontend (`frontend/.env.example`)
-```env
-# In prod builds (Netlify), set to your deployed API URL (Fly.io, etc.)
-VITE_API_URL=http://localhost:8080
+```bash
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
 ```
 
-The Docker build passes this in as a **build arg**:
-```yaml
-web:
-  build:
-    context: ./frontend
-    args:
-      VITE_API_URL: "http://localhost:8080"
+The seed command is safe to run again whenever the built-in curriculum changes:
+
+```bash
+docker compose exec api python -m app.seed
 ```
 
-### Backend (`backend/.env.example`)
-```env
-# For local (non-Docker) dev:
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/flashcards
-# In Docker, compose sets:
-# postgresql://postgres:postgres@db:5432/flashcards
+It is **idempotent**: existing cards are reused, new built-in cards are added, and missing default-user progress rows are repaired without duplicating the deck.
+
+---
+
+# 📚 216-card Platform Engineering curriculum
+
+Every domain contains **12 concept cards + 6 lab scenarios = 18 challenges**.
+
+| Domain | Concepts | Labs | Total |
+| --- | ---: | ---: | ---: |
+| Linux & OS | 12 | 6 | 18 |
+| Networking | 12 | 6 | 18 |
+| Containers | 12 | 6 | 18 |
+| Kubernetes | 12 | 6 | 18 |
+| CI/CD | 12 | 6 | 18 |
+| Cloud | 12 | 6 | 18 |
+| IaC & Terraform | 12 | 6 | 18 |
+| Observability | 12 | 6 | 18 |
+| Databases | 12 | 6 | 18 |
+| Security | 12 | 6 | 18 |
+| SRE & Reliability | 12 | 6 | 18 |
+| Incident Response | 12 | 6 | 18 |
+| **Total** | **144** | **72** | **216** |
+
+## Concept cards
+
+These are written more like **Platform Engineer interview questions** than vocabulary definitions.
+
+Examples:
+
+```text
+Kubernetes · What is the difference between liveness and readiness probes?
+Terraform · What does drift mean?
+Observability · What is an error budget?
+SRE · What is exponential backoff with jitter?
+Databases · What is point-in-time recovery?
 ```
 
-> `.env` files should **not** be committed. Examples are included for clarity.
+## 🧪 Lab / break-fix cards
+
+Lab prompts start with `LAB ·` and put you inside an operational situation. The answer gives you a troubleshooting path, implementation plan, or safe recovery sequence.
+
+Examples:
+
+```text
+LAB · Linux · A service works manually but fails after reboot.
+What do you check and fix?
+```
+
+```text
+LAB · Kubernetes · A Service has no traffic even though Pods are Running.
+What do you check?
+```
+
+```text
+LAB · CI/CD · Tests pass locally but fail in CI.
+What do you compare first?
+```
+
+```text
+LAB · Terraform · plan wants to recreate a critical database unexpectedly.
+What do you do?
+```
+
+```text
+LAB · Databases · The API reports "too many connections".
+What do you inspect and fix?
+```
+
+```text
+LAB · Incident · Error rate jumps immediately after a deployment.
+What is your first operational move?
+```
+
+The lab deck covers work such as:
+
+- setting up services and environments safely;
+- troubleshooting systemd, disk, memory, load, inodes, and file descriptors;
+- debugging DNS, TCP, TLS, proxies, MTU, routing, and 502s;
+- fixing container startup, networking, persistence, permissions, and health checks;
+- debugging `CrashLoopBackOff`, Pending Pods, probes, failed rollouts, and Services with no endpoints;
+- repairing CI failures, slow pipelines, leaked secrets, rollbacks, and artifact flow;
+- investigating cloud exposure, autoscaling, cost spikes, private networking, and workload identity;
+- handling Terraform drift, state locks, imports, dangerous plans, secrets, and module design;
+- diagnosing latency, noisy alerts, tracing gaps, SLOs, and telemetry cost;
+- fixing database connection exhaustion, slow queries, risky migrations, deadlocks, and recovery;
+- responding to CVEs, leaked credentials, excessive IAM, and software supply-chain risk;
+- designing retries, idempotent jobs, graceful degradation, circuit breakers, and chaos tests;
+- running incidents: triage, mitigation, incident command, rollback, communications, timelines, and postmortems.
+
+### Curriculum data
+
+The built-in curriculum is versioned separately from application code:
+
+```text
+backend/app/data/
+├── platform_engineering_cards.json   # 144 concepts
+└── platform_engineering_labs.json    # 72 break/fix labs
+```
+
+Automated tests verify:
+
+- 144 concept cards;
+- 72 lab cards;
+- 216 unique prompts total;
+- balanced domain counts;
+- rerunning the seed does not create duplicate cards or progress rows.
 
 ---
 
-## API Quick Reference
+# 🎮 Study experience
 
-Base URL: `http://localhost:8080`
+FlashQuest’s is designed as a **memory quest**, not a plain CRUD dashboard.
 
-- `GET /health` → `{ "ok": true }`
-- `POST /cards` → create a card (also creates `UserCard` at bin 0)
-  ```json
-  { "word": "abate", "definition": "to become less intense or widespread" }
-  ```
-- `GET /cards` → list cards (basic)
-- `GET /cards/admin` → list cards with status
-  Returns: `{ id, word, definition, bin, wrong_count, next_review_at, status }[]`
-- `GET /study/next` →
-  - `{ "status": "ok", "card": { ... } }` or
-  - `{ "status": "temporarily_done" }` or `{ "status": "permanently_done" }`
-- `POST /study/answer?card_id=ID&result=correct|wrong` → updates bins/timers
-  Returns: `{ "ok": true, "to_bin": number, "status": "active|never|hard_to_remember" }`
+- ⚡ session XP and player levels
+- 🔥 correct-answer combos and best streak
+- 🎯 session accuracy
+- ⭐ mastery based on the real backend spaced-repetition bin
+- ✨ animated answer/reward feedback
+- 🗺️ 12-level mastery map
+- 🏆 checkpoint and deck-completion states
+- ⌨️ keyboard controls: `Space` reveal, `1` missed, `2` nailed it
+- 🧪 **Deck Lab** for card administration
+- 🗺️ **Deck Map** for learning progress + runtime status
 
-OpenAPI docs at **/docs**.
+XP and combo values are intentionally session-local presentation state. **Durable mastery, review history, and card state live in PostgreSQL.**
 
 ---
 
-## Admin UI
+# 🧠 Spaced repetition
 
-Navigate to **`/admin`** in the SPA:
+Cards move through **12 mastery bins (`0`–`11`)**. Higher bins wait longer before becoming due again.
 
-- Create new cards
-- View all cards with **bin**, **next review**, **wrong count**, and **status**
+| Bin | Approx. delay |
+| --- | --- |
+| 0 | new |
+| 1 | 5s |
+| 2 | 30s |
+| 3 | 5m |
+| 4 | 30m |
+| 5 | 2h |
+| 6 | 6h |
+| 7 | 1d |
+| 8 | 2d |
+| 9 | 4d |
+| 10 | 7d |
+| 11 | terminal mastery |
+
+Rules:
+
+- **Correct** → advance one bin.
+- **Wrong** → return to bin 1 and increment the lifetime wrong count.
+- Repeated misses can mark a card `hard_to_remember`.
+- Terminal mastery removes a card from the active study queue.
+- Due cards are selected before new cards.
+- Every submitted answer creates a `Review` record for later analytics.
 
 ---
 
-## Development (without Docker) — optional
+# 🏗️ Architecture
 
-**Backend**
+```text
+┌──────────────────────┐
+│ React + TypeScript   │
+│ FlashQuest’s frontend │
+└──────────┬───────────┘
+           │ HTTP / JSON
+           ▼
+┌──────────────────────┐
+│ FastAPI              │
+│ study + card API     │
+└──────────┬───────────┘
+           │ SQLModel / SQLAlchemy
+           ▼
+┌──────────────────────┐
+│ PostgreSQL 16        │
+│ cards + reviews      │
+└──────────────────────┘
+           ▲
+           │ schema lifecycle
+┌──────────┴───────────┐
+│ Alembic migrations   │
+└──────────────────────┘
+```
+
+### Core stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, Axios, React Router |
+| Backend | FastAPI, SQLModel / SQLAlchemy, Pydantic Settings, Uvicorn |
+| Database | PostgreSQL 16 |
+| Schema lifecycle | Alembic |
+| Containers | Docker + Docker Compose |
+| Docs | MkDocs Material + mkdocstrings + TypeDoc |
+| CI | GitHub Actions |
+
+---
+
+# 🛠️ Platform Engineering built into FlashQuest’s
+
+| Area | Implementation |
+| --- | --- |
+| **Liveness** | lightweight process/service endpoint |
+| **Readiness** | executes a real database query; returns `503` when PostgreSQL is unavailable |
+| **Request correlation** | caller-provided or generated `X-Request-ID` |
+| **Timing** | `X-Response-Time-Ms` on API responses |
+| **Configuration** | environment-driven DB, CORS, app environment/version, and frontend API URL |
+| **Database lifecycle** | explicit Alembic migrations; startup does not silently mutate schema |
+| **Seed lifecycle** | reproducible, versioned, idempotent 216-card curriculum |
+| **Containers** | React/FastAPI/Postgres Compose stack; API runs as a non-root user |
+| **Dependency ordering** | API waits for PostgreSQL health; web waits for API readiness |
+| **CI/CD** | backend matrix, frontend lint/build, PostgreSQL migration smoke test, image builds |
+| **State boundaries** | durable domain state in PostgreSQL; ephemeral game feedback in the browser session |
+
+See [`docs/PLATFORM_ENGINEERING.md`](docs/PLATFORM_ENGINEERING.md) for the deeper architecture and operational design.
+
+---
+
+# ❤️ Health and readiness
+
+```text
+GET /health
+GET /health/live
+GET /health/ready
+```
+
+- `/health` — backwards-compatible lightweight response.
+- `/health/live` — confirms the service process is alive and exposes service metadata.
+- `/health/ready` — verifies the API can query PostgreSQL and returns `503` when it cannot.
+
+API responses also include:
+
+```text
+X-Request-ID
+X-Response-Time-Ms
+```
+
+If the caller supplies `X-Request-ID`, FlashQuest’s propagates it. Otherwise the API generates one.
+
+---
+
+# 🗃️ Database migrations
+
+After starting a **fresh** database, apply migrations before seeding:
+
+```bash
+docker compose exec api \
+  alembic -c /app/alembic.ini upgrade head
+```
+
+Create a migration after changing models:
+
+```bash
+docker compose exec api \
+  alembic -c /app/alembic.ini revision --autogenerate -m "describe change"
+```
+
+Inspect migration state:
+
+```bash
+docker compose exec api \
+  alembic -c /app/alembic.ini current
+```
+
+CI provisions a clean PostgreSQL 16 instance and runs `alembic upgrade head`, so migration failures are caught before merge.
+
+---
+
+# ✅ CI quality gates
+
+Pull requests validate four layers:
+
+1. **Backend — Python 3.11 + 3.12**
+   - compile
+   - pytest
+   - curriculum size/balance/idempotency tests
+   - Ruff correctness checks
+   - Black formatting check for the upgraded platform code
+2. **Frontend**
+   - clean `npm ci`
+   - ESLint
+   - TypeScript + production Vite build
+3. **Database migrations**
+   - clean PostgreSQL 16 service
+   - Alembic upgrade to `head`
+4. **Containers**
+   - `docker compose config`
+   - API image build
+   - web image build
+
+CI is intentionally a **quality gate**, not a workflow that silently rewrites contributor code and pushes it back to the branch.
+
+---
+
+# 🌐 Deployment notes
+
+The repository currently contains two separate web-facing concerns:
+
+- the **FlashQuest’s React application** under `frontend/`;
+- the **FlashQuest’s MkDocs documentation site** built from `netlify.toml` at the repository root.
+
+For a Netlify site that deploys the React application, use:
+
+```text
+Base directory: frontend
+Build command: npm run build
+Publish directory: dist
+```
+
+Set `VITE_API_URL` in that app site to the deployed FastAPI base URL. The root `netlify.toml` is for the documentation site and should not be repurposed accidentally for the React application.
+
+---
+
+# 💻 Development without Docker
+
+### Backend
+
 ```bash
 cd backend
 python -m venv .venv
-# Windows:
-.\.venv\Scripts\activate
-# macOS/Linux:
+
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux
 source .venv/bin/activate
 
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+alembic -c alembic.ini upgrade head
+python -m app.seed
 uvicorn app.main:app --reload --port 8080
 ```
 
-**Frontend**
+### Frontend
+
 ```bash
 cd frontend
-cp .env.example .env   # set VITE_API_URL if needed
 npm ci
 npm run dev
 ```
 
 ---
 
-## Deployment Plan (suggested)
+# 📁 Repository layout
 
-- **DB:** Neon (Postgres, serverless)
-- **API:** Fly.io (Docker image; set `DATABASE_URL` as a secret)
-- **Web:** Netlify (build with `VITE_API_URL` → Fly.io API URL)
-
-> Uptime can be monitored with UptimeRobot hitting `/health`. Requirement: live for 3+ weeks.
-
----
-
-## Testing & Next Steps (time permitting)
-
-- **Unit tests** for:
-  - Bin transitions and timers
-  - Selection ordering (due → new → messages)
-- **CI (GitHub Actions)**:
-  - `api`: lint + tests
-  - `web`: typecheck + build
-- **Polish**:
-  - CSV import in Admin
-  - Keyboard shortcuts (space to reveal; `1`/`2` for wrong/right)
-  - Minor styling pass
-- **Extend** to multiple users (schema already includes `user_id`)
-
----
-
-## Notes for Reviewers
-
-- Built as a **single-page app** with a **relational DB** to mirror your stack preference.
-- Backend and frontend are documented with **Google-style docstrings / JSDoc**.
-- Private repo as requested; happy to provide a mid-point check-in if desired.
+```text
+.
+├── .github/workflows/          # CI + docs workflows
+├── backend/
+│   ├── alembic/                # schema migrations
+│   ├── app/
+│   │   ├── data/
+│   │   │   ├── platform_engineering_cards.json
+│   │   │   └── platform_engineering_labs.json
+│   │   ├── routers/            # cards + study API routes
+│   │   ├── main.py             # FastAPI + operational endpoints
+│   │   ├── models.py           # persistent domain models
+│   │   └── seed.py             # curriculum loader + idempotent seeder
+│   ├── tests/                  # domain, API, operations, seed regression tests
+│   └── Dockerfile
+├── frontend/
+│   ├── src/pages/              # Memory Quest, Deck Lab, Deck Map
+│   ├── src/api.ts              # typed API client
+│   └── Dockerfile
+├── docs/                       # MkDocs + Platform Engineering docs
+├── docker-compose.yml
+└── mkdocs.yml
+```
 
 ---
 
-**Tiny example**
+# 🎯 Why FlashQuest’s belongs in a Platform Engineering portfolio
 
-1) New card starts in **bin 0** → drawn when nothing is due.
-2) You answer **correct** → moves to **bin 1**, `next_review_at = now + 5s`.
-3) After 5s, it’s **due**. If you answer **wrong** → **bin 1** again, `wrong_count++`.
-4) Keep getting it right → climbs bins; reaching **bin 11** sets status **never**.
-5) If `wrong_count = 10` at any point → status **hard_to_remember** (hidden forever).
+FlashQuest’s is both **the project and the practice environment**.
+
+You can use it to prepare answers for questions such as:
+
+- What is the difference between liveness and readiness?
+- Why does this Kubernetes Service have no endpoints?
+- Why does a test pass locally and fail in CI?
+- Why does Terraform want to replace this database?
+- How would you roll out a risky schema migration?
+- Why are DB connections exhausted?
+- How should retries, backoff, jitter, and idempotency interact?
+- How do request IDs help during distributed troubleshooting?
+- What is mitigation versus root-cause analysis during an incident?
+
+At the same time, the repository gives you concrete implementation decisions to discuss:
+
+- dependency-aware startup;
+- reproducible environment data;
+- explicit schema lifecycle management;
+- non-root container execution;
+- CI migration validation;
+- operational endpoint design;
+- durable versus ephemeral state boundaries;
+- automated regression coverage for the study curriculum itself.
 
 ---
 
-## License
+## Stop / reset
 
-Assessment purposes only (private repo).
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+Delete the local PostgreSQL volume and start from scratch:
+
+```bash
+docker compose down -v
+```
+
+Then repeat **start → migrate → seed** from the Quick start section.
+
+---
+
+<div align="center">
+
+### ⚡ FlashQuest’s
+
+**Learn it. Break it. Fix it. Remember it.**
+
+</div>

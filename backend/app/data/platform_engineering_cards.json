@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "name": "Platform Engineering Core",
+  "card_count": 144,
+  "domains": [
+    {
+      "name": "Linux & OS",
+      "cards": [
+        {"prompt": "Linux · What is the difference between a process and a thread?", "answer": "A process has its own virtual address space and resources; threads share a process's address space and resources while scheduling independently."},
+        {"prompt": "Linux · What does load average represent?", "answer": "The average number of tasks that are runnable or waiting on uninterruptible I/O over 1, 5, and 15 minutes."},
+        {"prompt": "Linux · What is a file descriptor?", "answer": "A small integer handle a process uses to reference an open file, socket, pipe, device, or other kernel-managed I/O object."},
+        {"prompt": "Linux · What does `systemd` manage?", "answer": "Services and system state, including startup ordering, dependencies, timers, sockets, logging integration, and service supervision."},
+        {"prompt": "Linux · What is the purpose of `/proc`?", "answer": "A virtual filesystem exposing kernel and process information such as CPU, memory, mounts, and per-process state."},
+        {"prompt": "Linux · What is the difference between a hard link and a symbolic link?", "answer": "A hard link points to the same inode as the original file; a symbolic link stores a path that resolves to another file."},
+        {"prompt": "Linux · What does the OOM killer do?", "answer": "When memory is critically exhausted, the kernel selects and terminates one or more processes to recover memory."},
+        {"prompt": "Linux · What is swap used for?", "answer": "It provides disk-backed virtual memory that can hold less-active pages when RAM pressure is high, trading speed for capacity."},
+        {"prompt": "Linux · What does `nice` influence?", "answer": "A process's CPU scheduling priority; a higher nice value generally means lower priority."},
+        {"prompt": "Linux · Why use `journalctl`?", "answer": "To query and filter logs collected by systemd-journald, including logs by service, boot, priority, and time range."},
+        {"prompt": "Linux · What is an inode?", "answer": "Filesystem metadata describing an object, including ownership, permissions, timestamps, size, and pointers to data blocks."},
+        {"prompt": "Linux · What problem do namespaces solve?", "answer": "They isolate views of system resources such as processes, networking, mounts, users, and hostnames, forming a foundation for containers."}
+      ]
+    },
+    {
+      "name": "Networking",
+      "cards": [
+        {"prompt": "Networking · What happens during a TCP three-way handshake?", "answer": "The client sends SYN, the server responds SYN-ACK, and the client replies ACK to establish sequence numbers and the connection."},
+        {"prompt": "Networking · What is the difference between TCP and UDP?", "answer": "TCP is connection-oriented and reliable with ordering and retransmission; UDP is connectionless with lower overhead and no delivery guarantees."},
+        {"prompt": "Networking · What does DNS do?", "answer": "It maps names to records such as IP addresses, aliases, mail servers, and service metadata through a hierarchical distributed system."},
+        {"prompt": "Networking · What is CIDR notation?", "answer": "A way to describe IP networks using a prefix length, such as 10.0.0.0/24, which specifies how many leading bits identify the network."},
+        {"prompt": "Networking · What is a subnet?", "answer": "A logical subdivision of an IP network defined by a network prefix and used to group addresses and control routing boundaries."},
+        {"prompt": "Networking · What does a default gateway do?", "answer": "It is the router a host sends traffic to when the destination is outside its directly connected networks."},
+        {"prompt": "Networking · What is NAT?", "answer": "Network Address Translation rewrites source or destination IP addresses and often ports, commonly allowing private addresses to share public connectivity."},
+        {"prompt": "Networking · What is the difference between a Layer 4 and Layer 7 load balancer?", "answer": "Layer 4 balances using transport information like IP and port; Layer 7 understands application protocols such as HTTP and can route by host, path, or headers."},
+        {"prompt": "Networking · What does TLS provide?", "answer": "Encryption, integrity, and peer authentication for network traffic, usually through certificates and negotiated session keys."},
+        {"prompt": "Networking · What is MTU?", "answer": "Maximum Transmission Unit: the largest packet payload a network link can carry without fragmentation at that layer."},
+        {"prompt": "Networking · Why does connection pooling matter?", "answer": "It reuses established connections, reducing handshake overhead and resource churn for repeated backend or database requests."},
+        {"prompt": "Networking · What is the purpose of a reverse proxy?", "answer": "It accepts client requests on behalf of backend services and can provide routing, TLS termination, caching, authentication, and load balancing."}
+      ]
+    },
+    {
+      "name": "Containers",
+      "cards": [
+        {"prompt": "Containers · What is the difference between an image and a container?", "answer": "An image is an immutable filesystem and metadata template; a container is a running or stopped instance created from an image."},
+        {"prompt": "Containers · Why are image layers useful?", "answer": "Layers are content-addressed and reusable, allowing efficient caching, distribution, and incremental image builds."},
+        {"prompt": "Containers · What does a container namespace isolate?", "answer": "Depending on namespace type, it can isolate processes, networking, mounts, users, IPC, or hostnames from the host and other containers."},
+        {"prompt": "Containers · What do cgroups control?", "answer": "They account for and limit resource usage such as CPU, memory, I/O, and process counts for groups of processes."},
+        {"prompt": "Containers · Why use multi-stage Docker builds?", "answer": "They separate build-time tooling from the runtime image, reducing image size and attack surface."},
+        {"prompt": "Containers · Why run containers as non-root?", "answer": "It limits the impact of a container compromise and follows least-privilege principles."},
+        {"prompt": "Containers · What is a Docker volume?", "answer": "Persistent storage managed outside a container's writable layer so data can survive container replacement."},
+        {"prompt": "Containers · What does a health check do?", "answer": "It periodically tests whether a containerized process is healthy or ready according to a command or endpoint."},
+        {"prompt": "Containers · Why pin base image versions or digests?", "answer": "To improve reproducibility and reduce surprise changes from mutable tags."},
+        {"prompt": "Containers · What is the container writable layer?", "answer": "The ephemeral filesystem layer on top of image layers where runtime file changes are stored unless a volume or bind mount is used."},
+        {"prompt": "Containers · Why keep `.dockerignore` small but intentional?", "answer": "It prevents unnecessary files, secrets, caches, and build artifacts from entering the build context, improving speed and reducing risk."},
+        {"prompt": "Containers · What is the difference between `ENTRYPOINT` and `CMD`?", "answer": "`ENTRYPOINT` defines the executable a container runs; `CMD` commonly supplies default arguments that can be overridden at runtime."}
+      ]
+    },
+    {
+      "name": "Kubernetes",
+      "cards": [
+        {"prompt": "Kubernetes · What is a Pod?", "answer": "The smallest schedulable Kubernetes unit, containing one or more containers that share networking and certain storage resources."},
+        {"prompt": "Kubernetes · What does a Deployment manage?", "answer": "It declaratively manages ReplicaSets and rolling updates for stateless application Pods."},
+        {"prompt": "Kubernetes · What is a Service?", "answer": "A stable virtual network endpoint that selects Pods and provides service discovery and load balancing inside or outside the cluster."},
+        {"prompt": "Kubernetes · What is the difference between liveness and readiness probes?", "answer": "Liveness asks whether a container should be restarted; readiness asks whether it should receive traffic."},
+        {"prompt": "Kubernetes · What does the scheduler do?", "answer": "It assigns unscheduled Pods to nodes based on resource requests, constraints, affinity, taints, topology, and other policies."},
+        {"prompt": "Kubernetes · What are resource requests and limits?", "answer": "Requests influence scheduling and reserved capacity; limits cap how much CPU or memory a container may use."},
+        {"prompt": "Kubernetes · What is a ConfigMap?", "answer": "A Kubernetes object for non-secret configuration data that can be injected into Pods as environment variables or files."},
+        {"prompt": "Kubernetes · What is a Secret?", "answer": "A Kubernetes object for sensitive configuration such as tokens or passwords; it still requires proper encryption and access controls to be secure."},
+        {"prompt": "Kubernetes · What does an Ingress do?", "answer": "It defines HTTP/HTTPS routing rules into cluster Services, implemented by an ingress controller."},
+        {"prompt": "Kubernetes · What are taints and tolerations?", "answer": "Taints repel Pods from nodes; tolerations allow matching Pods to be scheduled onto tainted nodes."},
+        {"prompt": "Kubernetes · What is a StatefulSet?", "answer": "A controller for workloads needing stable identities, ordered rollout, and often persistent per-Pod storage."},
+        {"prompt": "Kubernetes · What is a PodDisruptionBudget?", "answer": "It limits voluntary disruptions so a minimum number or percentage of application replicas remain available during operations like node drains."}
+      ]
+    },
+    {
+      "name": "CI/CD",
+      "cards": [
+        {"prompt": "CI/CD · What is continuous integration?", "answer": "Frequently merging changes into a shared branch with automated build, test, and quality checks."},
+        {"prompt": "CI/CD · What is continuous delivery?", "answer": "Keeping software in a deployable state so production releases can be performed reliably, often with a manual approval step."},
+        {"prompt": "CI/CD · What is continuous deployment?", "answer": "Automatically releasing every change that passes the required pipeline gates to production."},
+        {"prompt": "CI/CD · Why should pipelines fail fast?", "answer": "Early failure saves compute time and gives developers faster feedback before expensive later stages run."},
+        {"prompt": "CI/CD · What is an immutable artifact?", "answer": "A build output that is created once and promoted unchanged across environments, improving traceability and consistency."},
+        {"prompt": "CI/CD · Why separate build from deploy?", "answer": "It allows the same verified artifact to be promoted across environments and reduces environment-specific rebuild drift."},
+        {"prompt": "CI/CD · What is a deployment gate?", "answer": "A policy or approval condition that must pass before a release advances, such as tests, security checks, SLO signals, or human approval."},
+        {"prompt": "CI/CD · What is a canary deployment?", "answer": "A rollout strategy that sends a small portion of traffic to a new version first, expanding only if health signals remain acceptable."},
+        {"prompt": "CI/CD · What is blue-green deployment?", "answer": "Two production environments are maintained; traffic switches from the old environment to the new one after validation."},
+        {"prompt": "CI/CD · Why cache dependencies in CI?", "answer": "To reduce repeated download/build work and shorten pipeline duration while preserving correct cache keys and invalidation."},
+        {"prompt": "CI/CD · What is pipeline idempotency?", "answer": "Running the same pipeline step repeatedly produces the same intended state without unintended duplicate side effects."},
+        {"prompt": "CI/CD · Why record artifact provenance?", "answer": "It links an artifact to its source, build process, dependencies, and identity, supporting traceability and software supply-chain security."}
+      ]
+    },
+    {
+      "name": "Cloud",
+      "cards": [
+        {"prompt": "Cloud · What is the shared responsibility model?", "answer": "The provider secures the cloud infrastructure, while customers remain responsible for their data, identities, configuration, and workloads to varying degrees."},
+        {"prompt": "Cloud · What is horizontal scaling?", "answer": "Adding more instances or replicas to handle load rather than increasing the resources of one instance."},
+        {"prompt": "Cloud · What is vertical scaling?", "answer": "Increasing CPU, memory, or other resources on an existing instance."},
+        {"prompt": "Cloud · What is an availability zone?", "answer": "A physically separate failure domain within a cloud region, designed to isolate power, cooling, and other infrastructure failures."},
+        {"prompt": "Cloud · Why deploy across multiple availability zones?", "answer": "To reduce the chance that a single datacenter-level failure makes the service unavailable."},
+        {"prompt": "Cloud · What is object storage best suited for?", "answer": "Durable storage of blobs and files addressed as objects, such as backups, media, logs, and build artifacts."},
+        {"prompt": "Cloud · What is an IAM role?", "answer": "An identity with a set of permissions that can be assumed by users, workloads, or services without embedding long-lived credentials."},
+        {"prompt": "Cloud · What is autoscaling?", "answer": "Automatically adjusting capacity based on metrics, schedules, or demand to balance performance and cost."},
+        {"prompt": "Cloud · What is a managed service?", "answer": "A service where the cloud provider operates more of the underlying infrastructure and maintenance, such as patching or replication."},
+        {"prompt": "Cloud · What is an egress cost?", "answer": "A charge for data transferred out of a cloud provider, region, or service boundary depending on the provider's pricing model."},
+        {"prompt": "Cloud · Why tag cloud resources?", "answer": "Tags support ownership, cost allocation, inventory, policy enforcement, automation, and lifecycle management."},
+        {"prompt": "Cloud · What is a cloud landing zone?", "answer": "A standardized, governed cloud foundation defining accounts/projects, networking, identity, logging, security, and policy for teams to build on."}
+      ]
+    },
+    {
+      "name": "IaC & Terraform",
+      "cards": [
+        {"prompt": "IaC · What is Infrastructure as Code?", "answer": "Managing infrastructure through versioned declarative or programmatic definitions rather than manual console changes."},
+        {"prompt": "Terraform · What is state?", "answer": "Terraform's record of managed resource identities and known attributes, used to compare configuration with real infrastructure."},
+        {"prompt": "Terraform · Why use remote state?", "answer": "It centralizes state for teams and can add locking, encryption, backups, and controlled access."},
+        {"prompt": "Terraform · What does `terraform plan` show?", "answer": "The proposed changes Terraform would make to reconcile configured desired state with current known infrastructure."},
+        {"prompt": "Terraform · What does drift mean?", "answer": "Real infrastructure has changed outside the expected IaC workflow, causing it to differ from declared configuration or recorded state."},
+        {"prompt": "Terraform · What is a provider?", "answer": "A plugin that lets Terraform interact with a specific API or service and exposes resource and data-source types."},
+        {"prompt": "Terraform · What is a module?", "answer": "A reusable collection of Terraform resources with inputs and outputs that encapsulates a repeatable infrastructure pattern."},
+        {"prompt": "Terraform · Why pin provider versions?", "answer": "To prevent unexpected behavior from automatic upgrades and keep runs reproducible."},
+        {"prompt": "Terraform · What is state locking?", "answer": "A mechanism that prevents concurrent Terraform operations from modifying the same state at the same time."},
+        {"prompt": "IaC · Why review plans in pull requests?", "answer": "It makes intended infrastructure changes visible before apply, supporting peer review, policy checks, and safer change control."},
+        {"prompt": "IaC · What is policy as code?", "answer": "Machine-enforced rules that evaluate infrastructure or deployment configuration, such as requiring encryption, tags, or approved regions."},
+        {"prompt": "IaC · Why avoid secrets in Terraform state?", "answer": "State may persist sensitive values and be broadly accessible; secrets should be minimized, protected, and preferably referenced from dedicated secret systems."}
+      ]
+    },
+    {
+      "name": "Observability",
+      "cards": [
+        {"prompt": "Observability · What are the three common telemetry signals?", "answer": "Metrics, logs, and traces."},
+        {"prompt": "Observability · What is a metric?", "answer": "A numeric measurement over time, typically labeled by dimensions, used for trends, alerts, capacity, and health analysis."},
+        {"prompt": "Observability · What is structured logging?", "answer": "Emitting logs as machine-parseable fields, often JSON, so they can be reliably queried and correlated."},
+        {"prompt": "Observability · What is distributed tracing?", "answer": "Tracking a request across service boundaries using linked spans to understand latency and dependencies."},
+        {"prompt": "Observability · What is high-cardinality telemetry?", "answer": "Telemetry with labels or attributes that can take many unique values, such as user IDs, which can greatly increase storage and query cost."},
+        {"prompt": "Observability · What is an SLI?", "answer": "A Service Level Indicator is a measured signal of service behavior, such as successful request rate or latency."},
+        {"prompt": "Observability · What is an SLO?", "answer": "A Service Level Objective is a target for an SLI over a time window, such as 99.9% successful requests over 30 days."},
+        {"prompt": "Observability · What is an error budget?", "answer": "The allowed amount of unreliability implied by an SLO, used to balance feature velocity against reliability work."},
+        {"prompt": "Observability · What is a RED dashboard?", "answer": "A service-focused view of Rate, Errors, and Duration."},
+        {"prompt": "Observability · What is a USE dashboard?", "answer": "A resource-focused view of Utilization, Saturation, and Errors."},
+        {"prompt": "Observability · Why propagate request IDs?", "answer": "They let operators correlate logs and events belonging to the same request across services and proxies."},
+        {"prompt": "Observability · What makes an alert actionable?", "answer": "It indicates a meaningful user or system impact, has a clear owner, and provides enough context or runbook guidance for a response."}
+      ]
+    },
+    {
+      "name": "Databases",
+      "cards": [
+        {"prompt": "Databases · What is an ACID transaction?", "answer": "A transaction with Atomicity, Consistency, Isolation, and Durability guarantees."},
+        {"prompt": "Databases · What is an index?", "answer": "A data structure that speeds lookups and ordering at the cost of storage and additional write overhead."},
+        {"prompt": "Databases · What is a primary key?", "answer": "A column or set of columns that uniquely identifies each row in a table."},
+        {"prompt": "Databases · What is a foreign key?", "answer": "A constraint linking values in one table to a key in another, helping maintain referential integrity."},
+        {"prompt": "Databases · What is a database migration?", "answer": "A versioned change to database schema or data that can be applied in a controlled, repeatable sequence."},
+        {"prompt": "Databases · Why are connection pools used?", "answer": "They reuse database connections, avoiding expensive setup per request and controlling concurrent database load."},
+        {"prompt": "Databases · What is replication?", "answer": "Maintaining copies of data on multiple database nodes for availability, read scaling, disaster recovery, or locality."},
+        {"prompt": "Databases · What is the difference between a read replica and a primary?", "answer": "The primary accepts authoritative writes; read replicas copy changes and are typically used to scale reads or improve resilience."},
+        {"prompt": "Databases · What is transaction isolation?", "answer": "Rules controlling how concurrent transactions can observe each other's intermediate or committed changes."},
+        {"prompt": "Databases · What is a deadlock?", "answer": "Two or more transactions wait on locks held by each other, forming a cycle that the database must detect and break."},
+        {"prompt": "Databases · Why test migrations on a clean database in CI?", "answer": "It verifies the full migration chain can build the schema from scratch, catching ordering or dependency problems before deployment."},
+        {"prompt": "Databases · What is point-in-time recovery?", "answer": "Restoring a database to a specific moment using backups plus transaction or write-ahead logs."}
+      ]
+    },
+    {
+      "name": "Security",
+      "cards": [
+        {"prompt": "Security · What is least privilege?", "answer": "Granting identities only the permissions needed for their current responsibilities and no more."},
+        {"prompt": "Security · What is secret rotation?", "answer": "Replacing credentials or cryptographic secrets on a regular or event-driven basis while minimizing service disruption."},
+        {"prompt": "Security · Why avoid long-lived cloud access keys?", "answer": "They are harder to rotate and more damaging if leaked; short-lived workload identities reduce exposure."},
+        {"prompt": "Security · What is RBAC?", "answer": "Role-Based Access Control assigns permissions to roles and then maps users or workloads to those roles."},
+        {"prompt": "Security · What is a software supply-chain attack?", "answer": "Compromising dependencies, build systems, artifact repositories, or release processes to inject malicious software."},
+        {"prompt": "Security · What is an SBOM?", "answer": "A Software Bill of Materials inventories software components and dependencies contained in an artifact."},
+        {"prompt": "Security · Why scan container images?", "answer": "To identify known vulnerabilities, risky packages, secrets, and policy violations before deployment."},
+        {"prompt": "Security · What is defense in depth?", "answer": "Using multiple independent security controls so one control's failure does not expose the entire system."},
+        {"prompt": "Security · What is TLS certificate rotation?", "answer": "Replacing expiring or compromised certificates and keys while preserving trusted encrypted service communication."},
+        {"prompt": "Security · What is network segmentation?", "answer": "Dividing networks into controlled zones to limit lateral movement and restrict which systems can communicate."},
+        {"prompt": "Security · Why validate input at service boundaries?", "answer": "To reject malformed or unsafe data before it reaches deeper components, reducing exploitability and data integrity problems."},
+        {"prompt": "Security · What does zero trust mean?", "answer": "Do not grant implicit trust based on network location; continuously verify identity, device/workload context, and authorization for each access."}
+      ]
+    },
+    {
+      "name": "SRE & Reliability",
+      "cards": [
+        {"prompt": "SRE · What is toil?", "answer": "Manual, repetitive, automatable operational work that scales linearly with service growth and provides little enduring value."},
+        {"prompt": "SRE · What is mean time to recovery (MTTR)?", "answer": "The average time required to restore service after a failure or incident."},
+        {"prompt": "SRE · What is a graceful degradation strategy?", "answer": "Maintaining reduced but useful functionality when dependencies fail instead of causing a total outage."},
+        {"prompt": "SRE · What is fault tolerance?", "answer": "The ability of a system to continue operating correctly, possibly at reduced capacity, when components fail."},
+        {"prompt": "SRE · What is redundancy?", "answer": "Providing multiple components or paths so a single failure does not remove the required capability."},
+        {"prompt": "SRE · What is a single point of failure?", "answer": "A component whose failure can make the entire service or critical capability unavailable."},
+        {"prompt": "SRE · Why use timeouts on network calls?", "answer": "They bound how long a caller waits on an unhealthy dependency and help prevent resource exhaustion and cascading failures."},
+        {"prompt": "SRE · What is a retry storm?", "answer": "Excessive synchronized retries that amplify load on an already unhealthy dependency and can worsen an outage."},
+        {"prompt": "SRE · What is exponential backoff with jitter?", "answer": "A retry strategy that increases delay between attempts and adds randomness to avoid synchronized retry spikes."},
+        {"prompt": "SRE · What is a circuit breaker?", "answer": "A pattern that temporarily stops calls to a failing dependency after a threshold, allowing recovery and preventing repeated expensive failures."},
+        {"prompt": "SRE · What is capacity planning?", "answer": "Forecasting resource needs based on traffic, growth, performance characteristics, failure headroom, and business requirements."},
+        {"prompt": "SRE · Why perform game days or chaos experiments?", "answer": "To validate resilience assumptions, practice response, and discover failure modes before real incidents expose them."}
+      ]
+    },
+    {
+      "name": "Incident Response",
+      "cards": [
+        {"prompt": "Incidents · What is incident triage?", "answer": "Rapidly assessing impact, scope, severity, and likely ownership so the right responders and actions are engaged."},
+        {"prompt": "Incidents · What is the role of an incident commander?", "answer": "To coordinate response, set priorities, delegate work, and maintain a shared operational picture rather than debugging everything personally."},
+        {"prompt": "Incidents · What is mitigation?", "answer": "An action that reduces user impact quickly, even if it does not fix the underlying root cause."},
+        {"prompt": "Incidents · What is root cause analysis?", "answer": "A structured investigation into the technical and systemic contributors that allowed an incident to happen."},
+        {"prompt": "Incidents · What is a blameless postmortem?", "answer": "A review focused on learning from system conditions and decisions rather than punishing individuals for reasonable actions."},
+        {"prompt": "Incidents · Why keep an incident timeline?", "answer": "It preserves a factual sequence of symptoms, decisions, changes, and outcomes for coordination and later analysis."},
+        {"prompt": "Incidents · What is rollback?", "answer": "Returning to a previously known-good application or configuration version to reduce impact from a bad change."},
+        {"prompt": "Incidents · What is a runbook?", "answer": "A documented operational procedure for diagnosing or responding to a known condition or routine task."},
+        {"prompt": "Incidents · What is escalation?", "answer": "Bringing in additional expertise, authority, or resources when impact or uncertainty exceeds the current response team's capability."},
+        {"prompt": "Incidents · Why separate status communication from debugging?", "answer": "It keeps stakeholders informed without distracting every technical responder and provides consistent updates."},
+        {"prompt": "Incidents · What is change correlation?", "answer": "Checking whether recent deployments, configuration changes, traffic shifts, or dependency changes align with incident onset."},
+        {"prompt": "Incidents · What should a good postmortem produce?", "answer": "Concrete lessons and prioritized follow-up actions that reduce recurrence, improve detection, or make future recovery faster."}
+      ]
+    }
+  ]
+}
