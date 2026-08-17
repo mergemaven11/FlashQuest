@@ -6,6 +6,7 @@ Run with Docker:
 The seed operation is idempotent: existing cards are reused and missing
 default-user study state is repaired without duplicating content.
 """
+
 from __future__ import annotations
 
 import json
@@ -53,14 +54,18 @@ def load_deck(path: Path) -> dict[str, list[tuple[str, str]]]:
     return domains
 
 
-def flatten_deck(domains: dict[str, list[tuple[str, str]]]) -> list[tuple[str, str]]:
+def flatten_deck(
+    domains: dict[str, list[tuple[str, str]]],
+) -> list[tuple[str, str]]:
     """Flatten domain-grouped cards into the database seed order."""
     return [card for cards in domains.values() for card in cards]
 
 
 PLATFORM_ENGINEERING_DECK_BY_DOMAIN = load_deck(CONCEPT_DECK_PATH)
 PLATFORM_ENGINEERING_LABS_BY_DOMAIN = load_deck(LAB_DECK_PATH)
-PLATFORM_ENGINEERING_CONCEPT_DECK = flatten_deck(PLATFORM_ENGINEERING_DECK_BY_DOMAIN)
+PLATFORM_ENGINEERING_CONCEPT_DECK = flatten_deck(
+    PLATFORM_ENGINEERING_DECK_BY_DOMAIN
+)
 PLATFORM_ENGINEERING_LAB_DECK = flatten_deck(PLATFORM_ENGINEERING_LABS_BY_DOMAIN)
 PLATFORM_ENGINEERING_DECK = (
     PLATFORM_ENGINEERING_CONCEPT_DECK + PLATFORM_ENGINEERING_LAB_DECK
