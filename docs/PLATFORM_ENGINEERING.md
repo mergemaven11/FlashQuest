@@ -1,6 +1,6 @@
 # Platform engineering design
 
-FlashQuest is a learning product, but the repository is intentionally operated like a small production service. The goal is to make local development easy while keeping the runtime contracts clear enough for CI, containers, and hosted environments.
+FlashQuest’s is a learning product, but the repository is intentionally operated like a small production service. The goal is to make local development easy while keeping the runtime contracts clear enough for CI, containers, and hosted environments.
 
 ## Runtime topology
 
@@ -17,7 +17,7 @@ Local Docker Compose starts the same three service boundaries used by the deploy
 
 ## Health model
 
-FlashQuest separates **liveness** from **readiness**:
+FlashQuest’s separates **liveness** from **readiness**:
 
 - `GET /health` remains a backwards-compatible lightweight liveness endpoint.
 - `GET /health/live` proves the API process is serving requests and returns service/version/environment metadata.
