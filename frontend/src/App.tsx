@@ -23,7 +23,7 @@ export default function App() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-black tracking-tight text-white">FlashQuest</span>
+                  <span className="text-lg font-black tracking-tight text-white">FlashQuest’s</span>
                   <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-amber-200">
                     Quest Mode
                   </span>
