@@ -1,4 +1,5 @@
 """FastAPI application entry point and operational endpoints."""
+
 from __future__ import annotations
 
 import json
@@ -64,7 +65,9 @@ async def request_context(request: Request, call_next):
     started = perf_counter()
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
-    response.headers["X-Response-Time-Ms"] = f"{(perf_counter() - started) * 1000:.2f}"
+    response.headers["X-Response-Time-Ms"] = (
+        f"{(perf_counter() - started) * 1000:.2f}"
+    )
     return response
 
 
