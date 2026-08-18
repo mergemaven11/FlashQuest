@@ -3,8 +3,27 @@
 export type ISODate = string;
 export type CardKind = "concept" | "lab";
 
+export interface UserRead {
+  id: number;
+  email: string;
+  display_name: string;
+  is_verified: boolean;
+}
+
+export interface DeckRead {
+  id: number;
+  owner_id: number | null;
+  title: string;
+  slug: string;
+  description: string;
+  is_builtin: boolean;
+  card_count: number;
+  created_at: ISODate;
+}
+
 export interface CardRead {
   id: number;
+  deck_id: number | null;
   word: string;
   definition: string;
   topic: string;
@@ -21,8 +40,14 @@ export interface CardAdminRead extends CardRead {
 
 export type StudyNextOK = {
   status: "ok";
+  deck: {
+    id: number;
+    title: string;
+    is_builtin: boolean;
+  };
   card: {
     id: number;
+    deck_id: number | null;
     word: string;
     definition: string;
     topic: string;
@@ -39,9 +64,9 @@ export type StudyNextPermanent = { status: "permanently_done" };
 export type StudyNext = StudyNextOK | StudyNextTemporary | StudyNextPermanent;
 
 export interface CreateCardPayload {
+  deck_id: number;
   word: string;
   definition: string;
-  topic?: string;
   domain?: string;
   kind?: CardKind;
 }
@@ -49,14 +74,23 @@ export interface CreateCardPayload {
 export interface UpdateCardPayload {
   word?: string;
   definition?: string;
-  topic?: string;
   domain?: string;
   kind?: CardKind;
 }
 
-export interface StudyTopicSummary {
-  topic: string;
-  total: number;
-  concepts: number;
-  labs: number;
+export interface SignupPayload {
+  display_name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: "bearer";
+  user: UserRead;
 }
