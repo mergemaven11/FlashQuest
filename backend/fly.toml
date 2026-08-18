@@ -1,17 +1,16 @@
 # fly.toml app configuration file generated on 2025-08-19T14:38:34-04:00
 #
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+# See https://fly.io/docs/reference/configuration/ for information on this file.
 
 app = 'flashcards-tobias'
 primary_region = 'atl'
 
 [build]
-  # Using your Dockerfile in /backend
   dockerfile = "./Dockerfile"
 
 [deploy]
-  release_command = "alembic -c /app/alembic.ini upgrade head"
+  # Schema first, then idempotently repair/seed the built-in curriculum.
+  release_command = "sh -c 'alembic -c /app/alembic.ini upgrade head && python -m app.seed'"
 
 [env]
   PORT = "8080"
@@ -38,7 +37,7 @@ primary_region = 'atl'
   grace_period = "10s"
   interval = "10s"
   method = "GET"
-  path = "/health"
+  path = "/health/ready"
   timeout = "2s"
 
 [mounts]
