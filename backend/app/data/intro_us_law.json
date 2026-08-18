@@ -55,7 +55,7 @@
         {"prompt": "U.S. Law · What is an easement?", "answer": "An easement is a nonpossessory legal right to use or control another person's land for a particular purpose, such as access or utilities."},
         {"prompt": "U.S. Law · What is the difference between primary and secondary legal authority?", "answer": "Primary authority is law itself, such as constitutions, statutes, regulations, and cases; secondary authority explains or analyzes law, such as treatises, articles, and practice guides."},
         {"prompt": "U.S. Law · Why does jurisdiction matter when researching a legal question?", "answer": "A rule may differ among federal and state systems, and authorities from one jurisdiction may be binding, persuasive, or irrelevant in another."},
-        {"prompt": "U.S. Law · Why should a study deck about law not be treated as legal advice?", "answer": "Legal outcomes depend on facts, jurisdiction, current law, procedure, and professional judgment. Educational summaries cannot evaluate a specific person's legal rights or obligations."}
+        {"prompt": "U.S. Law · Why should a study deck about law not be treated as legal advice?", "answer": "This deck is not legal advice. Legal outcomes depend on facts, jurisdiction, current law, procedure, and professional judgment, so educational summaries cannot evaluate a specific person's legal rights or obligations."}
       ]
     }
   ]
