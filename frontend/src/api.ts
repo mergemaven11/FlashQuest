@@ -4,7 +4,9 @@ import type {
   CardAdminRead,
   CardRead,
   CreateCardPayload,
+  DeckPage,
   DeckRead,
+  LibraryDeckFilters,
   LoginPayload,
   LoginResponse,
   SignupPayload,
@@ -190,6 +192,35 @@ export async function logout(): Promise<void> {
 export async function getFeaturedDecks(): Promise<DeckRead[]> {
   try {
     const { data } = await api.get<DeckRead[]>("/decks/featured");
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function getLibraryDecks(filters: LibraryDeckFilters = {}): Promise<DeckPage> {
+  try {
+    const { data } = await api.get<DeckPage>("/decks/library", {
+      params: {
+        q: filters.q || undefined,
+        subject: filters.subject || undefined,
+        difficulty: filters.difficulty || undefined,
+        source: filters.source || undefined,
+        kind: filters.kind || undefined,
+        sort: filters.sort || undefined,
+        page: filters.page,
+        page_size: filters.page_size,
+      },
+    });
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function getSharedDeck(slug: string): Promise<DeckRead> {
+  try {
+    const { data } = await api.get<DeckRead>(`/decks/shared/${encodeURIComponent(slug)}`);
     return data;
   } catch (e) {
     throw normalizeError(e);
