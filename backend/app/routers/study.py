@@ -1,4 +1,4 @@
-"""Spaced-repetition study routes for featured and user-owned decks."""
+"""Spaced-repetition study routes for Official, shared, and user-owned decks."""
 
 from __future__ import annotations
 
@@ -160,14 +160,18 @@ def _resolve_deck(
     user: User | None,
     demo_session: str | None = None,
 ) -> tuple[Deck, int]:
+    """Resolve a deck and enforce its Library visibility at the study boundary."""
     deck = session.get(Deck, deck_id) if deck_id is not None else _default_featured_deck(session)
     if deck is None:
         raise HTTPException(status_code=404, detail="Deck not found")
-    if not deck.is_builtin:
+
+    shareable = deck.is_builtin or deck.visibility in {"public", "unlisted"}
+    owner = user is not None and deck.owner_id == user.id
+    if not shareable and not owner:
         if user is None:
-            raise HTTPException(status_code=401, detail="Sign in to study this deck")
-        if deck.owner_id != user.id:
-            raise HTTPException(status_code=403, detail="This deck belongs to another account")
+            raise HTTPException(status_code=401, detail="Sign in to study this private deck")
+        raise HTTPException(status_code=403, detail="This deck is private")
+
     user_id = int(user.id or 0) if user is not None else _demo_user_id(demo_session)
     return deck, user_id
 
@@ -194,7 +198,7 @@ def _ensure_progress(session: Session, user_id: int, deck_id: int) -> None:
 
 @router.get("/next")
 def study_next(
-    deck_id: int | None = Query(None, description="Featured or owned deck id"),
+    deck_id: int | None = Query(None, description="Official, shared, or owned deck id"),
     track: str = Query(
         "mixed",
         description="Study track: mixed, concept, or lab",
@@ -208,7 +212,7 @@ def study_next(
     user: User | None = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """Return the next due/new card for a featured or owned deck."""
+    """Return the next due/new card for an accessible deck."""
     if track not in VALID_TRACKS:
         raise HTTPException(status_code=422, detail="invalid study track")
 
