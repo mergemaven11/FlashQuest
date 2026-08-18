@@ -9,11 +9,14 @@ primary_region = 'atl'
   dockerfile = "./Dockerfile"
 
 [deploy]
-  # Schema first, then idempotently repair/seed the built-in curriculum.
+  # Schema first, then idempotently repair/seed the featured curriculum.
   release_command = "sh -c 'alembic -c /app/alembic.ini upgrade head && python -m app.seed'"
 
 [env]
   PORT = "8080"
+  APP_ENV = "production"
+  FRONTEND_URL = "https://flashcards-tobias.netlify.app"
+  EMAIL_DELIVERY_MODE = "resend"
 
 [[vm]]
   memory = "256mb"
