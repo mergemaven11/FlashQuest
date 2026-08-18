@@ -107,6 +107,15 @@ class DeckRead(DeckBase):
     updated_at: datetime
 
 
+class DeckPage(SQLModel):
+    """Stable paginated response for public Library discovery."""
+
+    items: list[DeckRead]
+    total: int
+    page: int
+    page_size: int
+
+
 class Deck(SQLModel, table=True):
     """A topic pack that can stay private or become a Library deck."""
 
