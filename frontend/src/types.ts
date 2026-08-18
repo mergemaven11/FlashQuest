@@ -4,6 +4,8 @@ export type ISODate = string;
 export type CardKind = "concept" | "lab";
 export type DeckDifficulty = "beginner" | "intermediate" | "advanced" | "expert";
 export type DeckVisibility = "private" | "unlisted" | "public";
+export type LibrarySource = "all" | "official" | "community";
+export type LibrarySort = "featured" | "newest" | "updated" | "title";
 
 export interface UserRead {
   id: number;
@@ -30,6 +32,24 @@ export interface DeckRead {
   card_count: number;
   created_at: ISODate;
   updated_at: ISODate;
+}
+
+export interface DeckPage {
+  items: DeckRead[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface LibraryDeckFilters {
+  q?: string;
+  subject?: string;
+  difficulty?: DeckDifficulty;
+  source?: LibrarySource;
+  kind?: CardKind;
+  sort?: LibrarySort;
+  page?: number;
+  page_size?: number;
 }
 
 export interface CardRead {
