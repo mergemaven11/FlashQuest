@@ -2,6 +2,7 @@
 #
 # See https://fly.io/docs/reference/configuration/ for information on this file.
 # Production deploys are triggered from GitHub Actions on pushes to main.
+# Deploy token configured: trigger a fresh production rollout.
 
 app = 'flashcards-tobias'
 primary_region = 'atl'
