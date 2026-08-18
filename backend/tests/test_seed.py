@@ -166,8 +166,25 @@ def test_seed_all_curricula_is_idempotent_and_library_ready(sqlite_session):
     assert len(sqlite_session.exec(select(UserCard)).all()) == 366
 
 
+def test_seeded_official_packs_appear_in_library_discovery(client, sqlite_session):
+    seed_all_curricula(sqlite_session)
+
+    response = client.get(
+        "/decks/library",
+        params={"source": "official", "page_size": 20, "sort": "title"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 6
+    assert {item["slug"] for item in payload["items"]} == {
+        spec.slug for spec in OFFICIAL_CURRICULA
+    }
+    assert all(item["is_official"] is True for item in payload["items"])
+    assert all(item["visibility"] == "public" for item in payload["items"])
+
+
 def test_seed_scopes_prompt_identity_to_each_deck(sqlite_session):
-    """The same wording in two decks must never move a card between curricula."""
+    """A second seed must never move cards between curricula."""
     first, second = OFFICIAL_CURRICULA[1], OFFICIAL_CURRICULA[2]
     seed_all_curricula(sqlite_session)
 
@@ -180,7 +197,6 @@ def test_seed_scopes_prompt_identity_to_each_deck(sqlite_session):
     original_first_deck_id = first_card.deck_id
     original_second_deck_id = second_card.deck_id
 
-    # A second seed is the regression check: deck-scoped lookup must leave both put.
     seed_all_curricula(sqlite_session)
     sqlite_session.refresh(first_card)
     sqlite_session.refresh(second_card)
