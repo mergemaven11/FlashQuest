@@ -1,11 +1,12 @@
-"""Public featured decks and verified-user deck management."""
+"""Public Library discovery and verified-user deck management."""
 
 from __future__ import annotations
 
 import re
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, HTTPException
+import sqlalchemy as sa
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlmodel import Session, delete, select
 
@@ -14,6 +15,7 @@ from ..models import (
     Card,
     Deck,
     DeckCreate,
+    DeckPage,
     DeckRead,
     DeckUpdate,
     Review,
@@ -25,6 +27,9 @@ from ..security import get_current_user, require_verified_user
 
 router = APIRouter(prefix="/decks", tags=["decks"])
 VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced", "expert"}
+VALID_LIBRARY_SOURCES = {"all", "official", "community"}
+VALID_LIBRARY_SORTS = {"featured", "newest", "updated", "title"}
+VALID_LIBRARY_KINDS = {"concept", "lab"}
 
 
 def _slugify(value: str) -> str:
@@ -118,6 +123,125 @@ def _owned_deck(session: Session, deck_id: int, user_id: int) -> Deck:
     if deck.owner_id != user_id or deck.is_builtin:
         raise HTTPException(status_code=403, detail="You can only change your own decks")
     return deck
+
+
+def _library_filters(
+    q: str | None,
+    subject: str | None,
+    difficulty: str | None,
+    source: str,
+    kind: str | None,
+) -> list[Any]:
+    filters: list[Any] = [Deck.visibility == "public"]
+
+    if q:
+        term = " ".join(q.strip().split())
+        if term:
+            pattern = f"%{term}%"
+            filters.append(
+                sa.or_(
+                    cast(Any, Deck.title).ilike(pattern),
+                    cast(Any, Deck.description).ilike(pattern),
+                    cast(Any, Deck.subject).ilike(pattern),
+                    sa.cast(Deck.tags, sa.String).ilike(pattern),
+                )
+            )
+
+    if subject:
+        normalized_subject = " ".join(subject.strip().split()).lower()
+        if normalized_subject:
+            filters.append(func.lower(Deck.subject) == normalized_subject)
+
+    if difficulty:
+        filters.append(Deck.difficulty == _clean_difficulty(difficulty))
+
+    normalized_source = source.strip().lower()
+    if normalized_source not in VALID_LIBRARY_SOURCES:
+        raise HTTPException(
+            status_code=422,
+            detail="Source must be all, official, or community",
+        )
+    if normalized_source == "official":
+        filters.append(Deck.is_builtin == True)  # noqa: E712
+    elif normalized_source == "community":
+        filters.append(Deck.is_builtin == False)  # noqa: E712
+
+    if kind:
+        normalized_kind = kind.strip().lower()
+        if normalized_kind not in VALID_LIBRARY_KINDS:
+            raise HTTPException(status_code=422, detail="Kind must be concept or lab")
+        matching_deck_ids = select(Card.deck_id).where(Card.kind == normalized_kind)
+        filters.append(cast(Any, Deck.id).in_(matching_deck_ids))
+
+    return filters
+
+
+def _library_order(sort: str) -> list[Any]:
+    normalized_sort = sort.strip().lower()
+    if normalized_sort not in VALID_LIBRARY_SORTS:
+        raise HTTPException(
+            status_code=422,
+            detail="Sort must be featured, newest, updated, or title",
+        )
+
+    if normalized_sort == "title":
+        return [func.lower(Deck.title).asc(), cast(Any, Deck.id).asc()]
+    if normalized_sort == "newest":
+        return [
+            func.coalesce(Deck.published_at, Deck.created_at).desc(),
+            cast(Any, Deck.id).desc(),
+        ]
+    if normalized_sort == "updated":
+        return [cast(Any, Deck.updated_at).desc(), cast(Any, Deck.id).desc()]
+    return [
+        cast(Any, Deck.is_builtin).desc(),
+        func.coalesce(Deck.published_at, Deck.created_at).desc(),
+        cast(Any, Deck.id).asc(),
+    ]
+
+
+@router.get("/library", response_model=DeckPage)
+def library_decks(
+    q: str | None = Query(None, max_length=120),
+    subject: str | None = Query(None, max_length=80),
+    difficulty: str | None = Query(None),
+    source: str = Query("all"),
+    kind: str | None = Query(None),
+    sort: str = Query("featured"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(12, ge=1, le=50),
+    session: Session = Depends(get_session),
+) -> DeckPage:
+    """Return public Library decks with search, filters, and stable pagination."""
+    filters = _library_filters(q, subject, difficulty, source, kind)
+    total = session.exec(
+        select(func.count()).select_from(Deck).where(*filters)
+    ).one()
+    decks = session.exec(
+        select(Deck)
+        .where(*filters)
+        .order_by(*_library_order(sort))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return DeckPage(
+        items=[_read(session, deck) for deck in decks],
+        total=int(total or 0),
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/shared/{slug}", response_model=DeckRead)
+def shared_deck(slug: str, session: Session = Depends(get_session)) -> DeckRead:
+    """Return a public or unlisted deck by direct shareable slug."""
+    deck = session.exec(select(Deck).where(Deck.slug == slug)).first()
+    if deck is None or (
+        not deck.is_builtin and deck.visibility not in {"public", "unlisted"}
+    ):
+        # Hide private deck existence from unauthenticated/share-link callers.
+        raise HTTPException(status_code=404, detail="Deck not found")
+    return _read(session, deck)
 
 
 @router.get("/featured", response_model=list[DeckRead])
