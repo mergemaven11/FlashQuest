@@ -1,105 +1,63 @@
-"""Database and Pydantic models for the flashcards app.
-
-This module defines:
-- SQLModel ORM tables (Card, UserCard, Review)
-- Pydantic schemas for requests/responses (CardCreate, CardRead, CardAdminRead, CardUpdate, CardStats)
-
-Notes:
-    We explicitly set `sa_type=` on fields so Alembic autogenerate emits plain
-    SQLAlchemy types (e.g., `sa.String`) instead of `AutoString`.
-"""
+"""Database and API models for FlashQuest’s study engine."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 import sqlalchemy as sa
-from sqlmodel import SQLModel, Field
+from sqlmodel import Field, SQLModel
 
 
 class CardBase(SQLModel):
-    """Base fields shared by Card schemas.
-
-    Attributes:
-        word: The vocabulary term.
-        definition: The meaning of the term.
-    """
+    """Fields used when creating a user-owned study card."""
 
     word: str
     definition: str
+    topic: str = "Custom"
+    domain: str = "General"
+    kind: str = "concept"
 
 
 class CardCreate(CardBase):
-    """Payload schema used to create a new card.
-
-    Inherits:
-        CardBase
-    """
-
-    pass
+    """Payload used to create a custom study card."""
 
 
 class CardRead(CardBase):
-    """Response schema for reading a card.
-
-    Attributes:
-        id: Primary key of the card.
-        created_at: Timestamp when the card was created (UTC).
-    """
+    """Public card representation."""
 
     id: int
     created_at: datetime
+    is_builtin: bool = False
 
 
-class CardAdminRead(SQLModel):
-    """Admin response schema with per-user study state.
+class CardAdminRead(CardRead):
+    """Card representation with spaced-repetition state."""
 
-    Attributes:
-        id: Card id.
-        word: The vocabulary term.
-        definition: The meaning of the term.
-        created_at: Card creation timestamp (UTC).
-        bin: Current spaced-repetition bin for the default user (0–11).
-        status: 'active', 'never', or 'hard_to_remember'.
-    """
-
-    id: int
-    word: str
-    definition: str
-    created_at: datetime
     bin: int
     status: str
 
 
 class CardUpdate(SQLModel):
-    """PATCH/PUT schema for updating a card.
-
-    Notes:
-        All fields are optional to support partial updates.
-
-    Attributes:
-        word: Optional new word value.
-        definition: Optional new definition value.
-    """
+    """Fields a user may customize on a card."""
 
     word: Optional[str] = None
     definition: Optional[str] = None
+    topic: Optional[str] = None
+    domain: Optional[str] = None
+    kind: Optional[str] = None
 
 
 class Card(SQLModel, table=True):
-    """ORM model representing a vocabulary flashcard.
-
-    Attributes:
-        id: Primary key.
-        word: The vocabulary term.
-        definition: The meaning of the term.
-        created_at: UTC timestamp when the card was created.
-    """
+    """A reusable study card that can belong to any topic or learning mode."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     word: str = Field(sa_type=sa.String)
     definition: str = Field(sa_type=sa.String)
+    topic: str = Field(default="Custom", index=True, sa_type=sa.String)
+    domain: str = Field(default="General", index=True, sa_type=sa.String)
+    kind: str = Field(default="concept", index=True, sa_type=sa.String)
+    is_builtin: bool = Field(default=False, index=True, sa_type=sa.Boolean)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_type=sa.DateTime(timezone=True),
@@ -107,17 +65,7 @@ class Card(SQLModel, table=True):
 
 
 class UserCard(SQLModel, table=True):
-    """ORM model tracking a user's progress on a specific card.
-
-    Attributes:
-        id: Primary key.
-        user_id: User identifier (MVP uses default=1).
-        card_id: Foreign key to `Card.id`.
-        bin: Current spaced-repetition bin (0–11).
-        wrong_count: Lifetime count of incorrect answers.
-        next_review_at: Next time the card becomes due (UTC).
-        status: 'active', 'never', or 'hard_to_remember'.
-    """
+    """Per-user spaced-repetition state for a card."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[int] = Field(default=1, index=True, sa_type=sa.Integer)
@@ -131,17 +79,7 @@ class UserCard(SQLModel, table=True):
 
 
 class Review(SQLModel, table=True):
-    """ORM model recording an individual study attempt.
-
-    Attributes:
-        id: Primary key.
-        card_id: Foreign key to `Card.id`.
-        user_id: User identifier (MVP uses default=1).
-        result: 'correct' or 'wrong'.
-        from_bin: Bin before the answer.
-        to_bin: Bin after applying the answer.
-        created_at: UTC timestamp when the review was recorded.
-    """
+    """Audit record for one answer in the study loop."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     card_id: int = Field(foreign_key="card.id", sa_type=sa.Integer)
@@ -156,15 +94,7 @@ class Review(SQLModel, table=True):
 
 
 class CardStats(SQLModel):
-    """Aggregated stats for admin dashboard.
-
-    Attributes:
-        total_cards: Number of cards tracked for the default user.
-        active: Count of cards with status 'active'.
-        never: Count of cards with status 'never' (last bin).
-        hard_to_remember: Count of cards hidden due to many wrong answers.
-        by_bin: A mapping of bin index (0..11) to count.
-    """
+    """Aggregated study stats for the default demo user."""
 
     total_cards: int
     active: int
