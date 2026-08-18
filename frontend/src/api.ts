@@ -4,12 +4,17 @@ import type {
   CardAdminRead,
   CardRead,
   CreateCardPayload,
+  DeckRead,
+  LoginPayload,
+  LoginResponse,
+  SignupPayload,
   StudyNext,
-  StudyTopicSummary,
   UpdateCardPayload,
+  UserRead,
 } from "./types";
 
 export type StudyTrack = "mixed" | "concept" | "lab";
+const TOKEN_KEY = "flashquest-access-token";
 
 export const BIN_DELAYS: Record<number, number> = {
   0: 0,
@@ -46,12 +51,19 @@ export function formatDelay(ms: number): string {
 export function apiBaseURL(): string {
   const configured = import.meta.env.VITE_API_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
-
   if (typeof window !== "undefined" && window.location.hostname.endsWith("netlify.app")) {
     return "https://flashcards-tobias.fly.dev";
   }
-
   return "http://localhost:8080";
+}
+
+export function getAccessToken(): string | null {
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAccessToken(token: string | null): void {
+  if (token) window.localStorage.setItem(TOKEN_KEY, token);
+  else window.localStorage.removeItem(TOKEN_KEY);
 }
 
 export const api = axios.create({
@@ -59,6 +71,12 @@ export const api = axios.create({
   timeout: 12_000,
   headers: { Accept: "application/json", "Content-Type": "application/json" },
   responseType: "json",
+});
+
+api.interceptors.request.use((config) => {
+  const token = typeof window !== "undefined" ? getAccessToken() : null;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
 });
 
 api.interceptors.response.use(
@@ -97,10 +115,99 @@ export async function checkApi(): Promise<boolean> {
   }
 }
 
-export async function getStudyTopics(): Promise<StudyTopicSummary[]> {
+export async function signup(payload: SignupPayload): Promise<{ message: string; email: string }> {
   try {
-    const { data } = await api.get<StudyTopicSummary[]>("/study/topics");
+    const { data } = await api.post<{ message: string; email: string }>("/auth/signup", payload);
     return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function verifyEmail(token: string): Promise<string> {
+  try {
+    const { data } = await api.post<{ message: string }>("/auth/verify", { token });
+    return data.message;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function resendVerification(email: string): Promise<string> {
+  try {
+    const { data } = await api.post<{ message: string }>("/auth/resend-verification", { email });
+    return data.message;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function login(payload: LoginPayload): Promise<LoginResponse> {
+  try {
+    const { data } = await api.post<LoginResponse>("/auth/login", payload);
+    setAccessToken(data.access_token);
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function getMe(): Promise<UserRead> {
+  try {
+    const { data } = await api.get<UserRead>("/auth/me");
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await api.post("/auth/logout");
+  } finally {
+    setAccessToken(null);
+  }
+}
+
+export async function getFeaturedDecks(): Promise<DeckRead[]> {
+  try {
+    const { data } = await api.get<DeckRead[]>("/decks/featured");
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function getMyDecks(): Promise<DeckRead[]> {
+  try {
+    const { data } = await api.get<DeckRead[]>("/decks/mine");
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function createDeck(title: string, description = ""): Promise<DeckRead> {
+  try {
+    const { data } = await api.post<DeckRead>("/decks", { title, description });
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function copyFeaturedDeck(deckId: number): Promise<DeckRead> {
+  try {
+    const { data } = await api.post<DeckRead>(`/decks/${deckId}/copy`);
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function deleteDeck(deckId: number): Promise<void> {
+  try {
+    await api.delete(`/decks/${deckId}`);
   } catch (e) {
     throw normalizeError(e);
   }
@@ -108,11 +215,11 @@ export async function getStudyTopics(): Promise<StudyTopicSummary[]> {
 
 export async function getStudyNext(
   track: StudyTrack = "mixed",
-  topic?: string
+  deckId?: number
 ): Promise<StudyNext> {
   try {
     const { data } = await api.get<StudyNext>("/study/next", {
-      params: { track, topic: topic || undefined },
+      params: { track, deck_id: deckId },
     });
     return data;
   } catch (e) {
@@ -145,10 +252,7 @@ export async function createCard(payload: CreateCardPayload): Promise<CardRead> 
   }
 }
 
-export async function updateCard(
-  id: number,
-  payload: UpdateCardPayload
-): Promise<CardRead> {
+export async function updateCard(id: number, payload: UpdateCardPayload): Promise<CardRead> {
   try {
     const { data } = await api.patch<CardRead>(`/cards/${id}`, payload);
     return data;
@@ -157,10 +261,10 @@ export async function updateCard(
   }
 }
 
-export async function listAdminCards(q?: string): Promise<CardAdminRead[]> {
+export async function listAdminCards(q?: string, deckId?: number): Promise<CardAdminRead[]> {
   try {
     const { data } = await api.get<CardAdminRead[]>("/cards/admin", {
-      params: q ? { q } : undefined,
+      params: { q: q || undefined, deck_id: deckId },
     });
     return data;
   } catch (e) {
