@@ -3,8 +3,8 @@
 Run with Docker:
     docker compose exec api python -m app.seed
 
-The seed operation is idempotent: existing cards are reused and missing
-default-user study state is repaired without duplicating content.
+The seed operation is idempotent: existing cards are reused, built-in metadata is
+repaired, and missing default-user study state is created without duplicates.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from .models import Card, UserCard
 DATA_DIR = Path(__file__).parent / "data"
 CONCEPT_DECK_PATH = DATA_DIR / "platform_engineering_cards.json"
 LAB_DECK_PATH = DATA_DIR / "platform_engineering_labs.json"
+PLATFORM_TOPIC = "Platform Engineering"
 
 
 def load_deck(path: Path) -> dict[str, list[tuple[str, str]]]:
@@ -61,6 +62,17 @@ def flatten_deck(
     return [card for cards in domains.values() for card in cards]
 
 
+def deck_metadata(
+    domains: dict[str, list[tuple[str, str]]], kind: str
+) -> dict[str, tuple[str, str]]:
+    """Map each prompt to its domain and learning mode."""
+    return {
+        prompt: (domain, kind)
+        for domain, cards in domains.items()
+        for prompt, _answer in cards
+    }
+
+
 PLATFORM_ENGINEERING_DECK_BY_DOMAIN = load_deck(CONCEPT_DECK_PATH)
 PLATFORM_ENGINEERING_LABS_BY_DOMAIN = load_deck(LAB_DECK_PATH)
 PLATFORM_ENGINEERING_CONCEPT_DECK = flatten_deck(PLATFORM_ENGINEERING_DECK_BY_DOMAIN)
@@ -68,6 +80,10 @@ PLATFORM_ENGINEERING_LAB_DECK = flatten_deck(PLATFORM_ENGINEERING_LABS_BY_DOMAIN
 PLATFORM_ENGINEERING_DECK = (
     PLATFORM_ENGINEERING_CONCEPT_DECK + PLATFORM_ENGINEERING_LAB_DECK
 )
+PLATFORM_ENGINEERING_METADATA = {
+    **deck_metadata(PLATFORM_ENGINEERING_DECK_BY_DOMAIN, "concept"),
+    **deck_metadata(PLATFORM_ENGINEERING_LABS_BY_DOMAIN, "lab"),
+}
 
 if len({prompt for prompt, _ in PLATFORM_ENGINEERING_DECK}) != len(
     PLATFORM_ENGINEERING_DECK
@@ -76,7 +92,7 @@ if len({prompt for prompt, _ in PLATFORM_ENGINEERING_DECK}) != len(
 
 
 def seed_platform_deck(session: Session) -> dict[str, int]:
-    """Insert the complete Platform Engineering deck and default-user study state."""
+    """Insert or repair the built-in Platform Engineering demo deck."""
     existing_cards = {card.word: card for card in session.exec(select(Card)).all()}
     existing_progress_ids = set(
         session.exec(select(UserCard.card_id).where(UserCard.user_id == 1)).all()
@@ -84,18 +100,42 @@ def seed_platform_deck(session: Session) -> dict[str, int]:
 
     inserted_cards = 0
     existing_count = 0
+    updated_cards = 0
     created_progress = 0
 
     for prompt, answer in PLATFORM_ENGINEERING_DECK:
+        domain, kind = PLATFORM_ENGINEERING_METADATA[prompt]
         card = existing_cards.get(prompt)
         if card is None:
-            card = Card(word=prompt, definition=answer)
+            card = Card(
+                word=prompt,
+                definition=answer,
+                topic=PLATFORM_TOPIC,
+                domain=domain,
+                kind=kind,
+                is_builtin=True,
+            )
             session.add(card)
             session.flush()
             existing_cards[prompt] = card
             inserted_cards += 1
         else:
             existing_count += 1
+            desired = {
+                "definition": answer,
+                "topic": PLATFORM_TOPIC,
+                "domain": domain,
+                "kind": kind,
+                "is_builtin": True,
+            }
+            changed = False
+            for field, value in desired.items():
+                if getattr(card, field) != value:
+                    setattr(card, field, value)
+                    changed = True
+            if changed:
+                session.add(card)
+                updated_cards += 1
 
         if card.id is not None and card.id not in existing_progress_ids:
             session.add(UserCard(card_id=card.id, user_id=1, bin=0))
@@ -109,6 +149,7 @@ def seed_platform_deck(session: Session) -> dict[str, int]:
         "lab_cards": len(PLATFORM_ENGINEERING_LAB_DECK),
         "inserted_cards": inserted_cards,
         "existing_cards": existing_count,
+        "updated_cards": updated_cards,
         "created_progress": created_progress,
     }
 
@@ -123,6 +164,7 @@ def run() -> None:
         f"{result['deck_size']} cards "
         f"({result['concept_cards']} concepts + {result['lab_cards']} labs; "
         f"{result['inserted_cards']} inserted, "
+        f"{result['updated_cards']} metadata repaired, "
         f"{result['existing_cards']} already present, "
         f"{result['created_progress']} progress rows created)."
     )
