@@ -1,22 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-
-export type GameSound =
-  | "tap"
-  | "navigate"
-  | "hint"
-  | "reveal"
-  | "success"
-  | "miss"
-  | "skip"
-  | "save"
-  | "publish"
-  | "combo"
-  | "levelUp"
-  | "achievement"
-  | "roomJoin"
-  | "roundStart"
-  | "roundEnd"
-  | "complete";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { GameFeelContext, useGameFeel, type GameSound } from "./gameFeelContext";
 
 type ToneStep = {
   frequency: number;
@@ -26,15 +9,7 @@ type ToneStep = {
   gain: number;
 };
 
-type GameFeelValue = {
-  soundEnabled: boolean;
-  setSoundEnabled: (enabled: boolean) => void;
-  toggleSound: () => void;
-  play: (sound: GameSound) => void;
-};
-
 const SOUND_KEY = "flashquest-sound-enabled";
-const GameFeelContext = createContext<GameFeelValue | null>(null);
 
 const patterns: Record<GameSound, ToneStep[]> = {
   tap: [{ frequency: 330, offsetMs: 0, durationMs: 45, type: "sine", gain: 0.025 }],
@@ -193,12 +168,6 @@ export function GameFeelProvider({ children }: { children: ReactNode }) {
   );
 
   return <GameFeelContext.Provider value={value}>{children}</GameFeelContext.Provider>;
-}
-
-export function useGameFeel(): GameFeelValue {
-  const value = useContext(GameFeelContext);
-  if (!value) throw new Error("useGameFeel must be used inside GameFeelProvider");
-  return value;
 }
 
 export function SoundToggle() {
