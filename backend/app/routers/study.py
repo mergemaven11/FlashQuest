@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import and_, asc, desc, func
 from sqlmodel import Session, select
 
@@ -46,12 +47,48 @@ def _next_review_at_from_bin(b: int) -> Optional[datetime]:
     return None if delay is None else _now_utc() + delay
 
 
-def _card_filters(deck_id: int | None, track: str) -> list[Any]:
+def _demo_user_id(demo_session: str | None) -> int:
+    """Map one browser-session token to a stable negative demo user id.
+
+    Real account ids are positive. Negative ids keep anonymous progress isolated
+    per browser session without creating throwaway account rows.
+    """
+    token = (demo_session or "").strip()[:128]
+    if not token:
+        return DEMO_USER_ID
+    digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+    value = int.from_bytes(digest, "big") & ((1 << 63) - 1)
+    return -(value or 1)
+
+
+def _parse_excluded_card_ids(raw: str | None) -> set[int]:
+    if not raw:
+        return set()
+    values: set[int] = set()
+    for item in raw.split(","):
+        try:
+            value = int(item.strip())
+        except ValueError:
+            continue
+        if value > 0:
+            values.add(value)
+        if len(values) >= 250:
+            break
+    return values
+
+
+def _card_filters(
+    deck_id: int | None,
+    track: str,
+    exclude_card_ids: set[int] | None = None,
+) -> list[Any]:
     filters: list[Any] = []
     if deck_id is not None:
         filters.append(Card.deck_id == deck_id)
     if track in {"concept", "lab"}:
         filters.append(Card.kind == track)
+    if exclude_card_ids:
+        filters.append(~cast(Any, Card.id).in_(sorted(exclude_card_ids)))
     return filters
 
 
@@ -60,6 +97,7 @@ def _select_next_card_pair(
     user_id: int = DEMO_USER_ID,
     deck_id: int | None = None,
     track: str = "mixed",
+    exclude_card_ids: set[int] | None = None,
 ) -> Optional[tuple[Card, UserCard]]:
     """Select the next due/new card for one user, deck, and learning mode."""
     nr = cast(Any, UserCard.next_review_at)
@@ -67,7 +105,7 @@ def _select_next_card_pair(
     cid = cast(Any, Card.id)
     created = cast(Any, Card.created_at)
     uc_card_id = cast(Any, UserCard.card_id)
-    card_filters = _card_filters(deck_id, track)
+    card_filters = _card_filters(deck_id, track, exclude_card_ids)
 
     due_conditions: list[Any] = [
         UserCard.user_id == user_id,
@@ -117,7 +155,10 @@ def _default_featured_deck(session: Session) -> Deck | None:
 
 
 def _resolve_deck(
-    session: Session, deck_id: int | None, user: User | None
+    session: Session,
+    deck_id: int | None,
+    user: User | None,
+    demo_session: str | None = None,
 ) -> tuple[Deck, int]:
     deck = session.get(Deck, deck_id) if deck_id is not None else _default_featured_deck(session)
     if deck is None:
@@ -127,7 +168,7 @@ def _resolve_deck(
             raise HTTPException(status_code=401, detail="Sign in to study this deck")
         if deck.owner_id != user.id:
             raise HTTPException(status_code=403, detail="This deck belongs to another account")
-    user_id = int(user.id or 0) if user is not None else DEMO_USER_ID
+    user_id = int(user.id or 0) if user is not None else _demo_user_id(demo_session)
     return deck, user_id
 
 
@@ -159,6 +200,11 @@ def study_next(
         description="Study track: mixed, concept, or lab",
         pattern="^(mixed|concept|lab)$",
     ),
+    exclude_card_ids: str | None = Query(
+        None,
+        description="Comma-separated card ids to avoid when drawing the next card",
+    ),
+    demo_session: str | None = Header(None, alias="X-Demo-Session"),
     user: User | None = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
@@ -166,11 +212,23 @@ def study_next(
     if track not in VALID_TRACKS:
         raise HTTPException(status_code=422, detail="invalid study track")
 
-    deck, user_id = _resolve_deck(session, deck_id, user)
+    deck, user_id = _resolve_deck(session, deck_id, user, demo_session)
     resolved_deck_id = int(deck.id or 0)
     _ensure_progress(session, user_id, resolved_deck_id)
 
-    pair = _select_next_card_pair(session, user_id, resolved_deck_id, track)
+    excluded = _parse_excluded_card_ids(exclude_card_ids)
+    pair = _select_next_card_pair(
+        session,
+        user_id,
+        resolved_deck_id,
+        track,
+        exclude_card_ids=excluded,
+    )
+    # If a user skipped every eligible card, start a fresh pass instead of
+    # pretending the deck is finished.
+    if pair is None and excluded:
+        pair = _select_next_card_pair(session, user_id, resolved_deck_id, track)
+
     if pair:
         card, uc = pair
         return {
@@ -211,6 +269,7 @@ def study_next(
 def submit_answer(
     card_id: int = Query(...),
     result: str = Query(..., pattern="^(correct|wrong)$"),
+    demo_session: str | None = Header(None, alias="X-Demo-Session"),
     user: User | None = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
@@ -221,7 +280,7 @@ def submit_answer(
     card = session.get(Card, card_id)
     if card is None or card.deck_id is None:
         raise HTTPException(status_code=404, detail="Card not found")
-    _deck, user_id = _resolve_deck(session, card.deck_id, user)
+    _deck, user_id = _resolve_deck(session, card.deck_id, user, demo_session)
     _ensure_progress(session, user_id, card.deck_id)
 
     uc = session.exec(
