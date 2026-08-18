@@ -1,4 +1,5 @@
-# app/routers/study.py
+"""Spaced-repetition study routes for featured and user-owned decks."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -9,15 +10,14 @@ from sqlalchemy import and_, asc, desc, func
 from sqlmodel import Session, select
 
 from ..db import get_session
-from ..models import Card, Review, UserCard
+from ..models import Card, Deck, Review, User, UserCard
+from ..security import DEMO_USER_ID, get_optional_user
 
 router = APIRouter(prefix="/study", tags=["study"])
-DEFAULT_USER_ID = 1
 VALID_TRACKS = {"mixed", "concept", "lab"}
 
 
 def _now_utc() -> datetime:
-    """Return timezone-aware UTC datetime."""
     return datetime.now(timezone.utc)
 
 
@@ -38,47 +38,45 @@ BIN_DELAYS: dict[int, Optional[timedelta]] = {
 
 
 def _fallback_delay_for_bin(b: int) -> Optional[timedelta]:
-    """Return the configured delay for a bin; None means terminal mastery."""
     return BIN_DELAYS.get(int(b), timedelta(minutes=1))
 
 
 def _next_review_at_from_bin(b: int) -> Optional[datetime]:
-    """Compute the next review time in UTC."""
     delay = _fallback_delay_for_bin(b)
     return None if delay is None else _now_utc() + delay
 
 
-def _card_filters(topic: str | None, track: str) -> list[Any]:
-    """Build reusable card filters for topic and learning mode."""
+def _card_filters(deck_id: int | None, track: str) -> list[Any]:
     filters: list[Any] = []
-    if topic:
-        filters.append(cast(Any, Card.topic) == topic)
+    if deck_id is not None:
+        filters.append(Card.deck_id == deck_id)
     if track in {"concept", "lab"}:
-        filters.append(cast(Any, Card.kind) == track)
+        filters.append(Card.kind == track)
     return filters
 
 
 def _select_next_card_pair(
     session: Session,
-    topic: str | None = None,
+    user_id: int = DEMO_USER_ID,
+    deck_id: int | None = None,
     track: str = "mixed",
 ) -> Optional[tuple[Card, UserCard]]:
-    """Select the next due/new card for a topic and learning mode."""
+    """Select the next due/new card for one user, deck, and learning mode."""
     nr = cast(Any, UserCard.next_review_at)
     b = cast(Any, UserCard.bin)
     cid = cast(Any, Card.id)
     created = cast(Any, Card.created_at)
     uc_card_id = cast(Any, UserCard.card_id)
-    card_filters = _card_filters(topic, track)
+    card_filters = _card_filters(deck_id, track)
 
     due_conditions: list[Any] = [
-        UserCard.user_id == DEFAULT_USER_ID,
+        UserCard.user_id == user_id,
         UserCard.status == "active",
         and_(nr.is_not(None), nr <= func.now()),
         *card_filters,
     ]
     new_conditions: list[Any] = [
-        UserCard.user_id == DEFAULT_USER_ID,
+        UserCard.user_id == user_id,
         UserCard.status == "active",
         cast(Any, UserCard.bin) == 0,
         nr.is_(None),
@@ -103,76 +101,88 @@ def _select_next_card_pair(
         .order_by(desc(created), desc(cid))
         .limit(1)
     )
-    new_row = session.exec(new_stmt).first()
-    if new_row:
-        return new_row
-
-    return None
+    return session.exec(new_stmt).first()
 
 
 def select_next_card(session: Session) -> Optional[Card]:
-    """Compatibility helper used by tests and callers that want a mixed deck."""
+    """Compatibility helper used by unit tests."""
     pair = _select_next_card_pair(session)
     return pair[0] if pair else None
 
 
-@router.get("/topics")
-def study_topics(session: Session = Depends(get_session)) -> list[dict[str, Any]]:
-    """Return available topics with concept/lab counts for the topic picker."""
-    rows = session.exec(select(Card.topic, Card.kind)).all()
-    topics: dict[str, dict[str, Any]] = {}
-    for topic_value, kind_value in rows:
-        topic = str(topic_value or "Custom")
-        kind = str(kind_value or "concept")
-        item = topics.setdefault(
-            topic,
-            {"topic": topic, "total": 0, "concepts": 0, "labs": 0},
-        )
-        item["total"] += 1
-        if kind == "lab":
-            item["labs"] += 1
-        else:
-            item["concepts"] += 1
-    return sorted(topics.values(), key=lambda item: (-item["total"], item["topic"]))
+def _default_featured_deck(session: Session) -> Deck | None:
+    return session.exec(
+        select(Deck).where(Deck.is_builtin == True).order_by(Deck.id)  # noqa: E712
+    ).first()
+
+
+def _resolve_deck(
+    session: Session, deck_id: int | None, user: User | None
+) -> tuple[Deck, int]:
+    deck = session.get(Deck, deck_id) if deck_id is not None else _default_featured_deck(session)
+    if deck is None:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    if not deck.is_builtin:
+        if user is None:
+            raise HTTPException(status_code=401, detail="Sign in to study this deck")
+        if deck.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="This deck belongs to another account")
+    user_id = int(user.id or 0) if user is not None else DEMO_USER_ID
+    return deck, user_id
+
+
+def _ensure_progress(session: Session, user_id: int, deck_id: int) -> None:
+    """Create missing per-user progress rows for every card in a selected deck."""
+    card_ids = list(session.exec(select(Card.id).where(Card.deck_id == deck_id)).all())
+    if not card_ids:
+        return
+    existing = set(
+        session.exec(
+            select(UserCard.card_id).where(
+                UserCard.user_id == user_id,
+                cast(Any, UserCard.card_id).in_(card_ids),
+            )
+        ).all()
+    )
+    missing = [card_id for card_id in card_ids if card_id not in existing]
+    for card_id in missing:
+        session.add(UserCard(user_id=user_id, card_id=card_id, bin=0))
+    if missing:
+        session.commit()
 
 
 @router.get("/next")
 def study_next(
-    topic: str | None = Query(None, description="Optional topic/deck name"),
+    deck_id: int | None = Query(None, description="Featured or owned deck id"),
     track: str = Query(
         "mixed",
         description="Study track: mixed, concept, or lab",
         pattern="^(mixed|concept|lab)$",
     ),
+    user: User | None = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """Return the next due/new card for the selected topic and track."""
+    """Return the next due/new card for a featured or owned deck."""
     if track not in VALID_TRACKS:
         raise HTTPException(status_code=422, detail="invalid study track")
 
-    cid = cast(Any, Card.id)
-    uc_card_id = cast(Any, UserCard.card_id)
-    active_conditions: list[Any] = [
-        UserCard.user_id == DEFAULT_USER_ID,
-        UserCard.status == "active",
-        *_card_filters(topic, track),
-    ]
+    deck, user_id = _resolve_deck(session, deck_id, user)
+    resolved_deck_id = int(deck.id or 0)
+    _ensure_progress(session, user_id, resolved_deck_id)
 
-    has_active = session.exec(
-        select(UserCard.id)
-        .join(Card, uc_card_id == cid)
-        .where(*active_conditions)
-    ).first()
-    if has_active is None:
-        return {"status": "permanently_done"}
-
-    pair = _select_next_card_pair(session, topic, track)
+    pair = _select_next_card_pair(session, user_id, resolved_deck_id, track)
     if pair:
         card, uc = pair
         return {
             "status": "ok",
+            "deck": {
+                "id": resolved_deck_id,
+                "title": deck.title,
+                "is_builtin": deck.is_builtin,
+            },
             "card": {
                 "id": card.id,
+                "deck_id": card.deck_id,
                 "word": card.word,
                 "definition": card.definition,
                 "topic": card.topic,
@@ -184,29 +194,44 @@ def study_next(
             },
         }
 
-    return {"status": "temporarily_done"}
+    active = session.exec(
+        select(UserCard.id)
+        .join(Card, UserCard.card_id == Card.id)
+        .where(
+            UserCard.user_id == user_id,
+            UserCard.status == "active",
+            Card.deck_id == resolved_deck_id,
+            *_card_filters(None, track),
+        )
+    ).first()
+    return {"status": "permanently_done" if active is None else "temporarily_done"}
 
 
 @router.post("/answer")
 def submit_answer(
-    card_id: int = Query(..., description="Card ID to answer"),
-    result: str = Query(..., description="'correct' or 'wrong'"),
+    card_id: int = Query(...),
+    result: str = Query(..., pattern="^(correct|wrong)$"),
+    user: User | None = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """Accept an answer and update spaced-repetition state."""
-    if result not in ("correct", "wrong"):
-        raise HTTPException(
-            status_code=422, detail="result must be 'correct' or 'wrong'"
-        )
+    """Update spaced-repetition state for the current demo/account user."""
+    if result not in {"correct", "wrong"}:
+        raise HTTPException(status_code=422, detail="result must be 'correct' or 'wrong'")
+
+    card = session.get(Card, card_id)
+    if card is None or card.deck_id is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    _deck, user_id = _resolve_deck(session, card.deck_id, user)
+    _ensure_progress(session, user_id, card.deck_id)
 
     uc = session.exec(
         select(UserCard).where(
             UserCard.card_id == card_id,
-            UserCard.user_id == DEFAULT_USER_ID,
+            UserCard.user_id == user_id,
         )
     ).first()
-    if not uc:
-        raise HTTPException(status_code=404, detail="Card not found")
+    if uc is None:
+        raise HTTPException(status_code=404, detail="Study progress not found")
 
     from_bin = uc.bin
     if result == "correct":
@@ -225,7 +250,7 @@ def submit_answer(
     session.add(
         Review(
             card_id=card_id,
-            user_id=DEFAULT_USER_ID,
+            user_id=user_id,
             result=result,
             from_bin=from_bin,
             to_bin=uc.bin,
@@ -234,5 +259,4 @@ def submit_answer(
     )
     session.add(uc)
     session.commit()
-
     return {"ok": True, "to_bin": uc.bin, "status": uc.status}
