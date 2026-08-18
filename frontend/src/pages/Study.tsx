@@ -58,6 +58,7 @@ export default function Study() {
   const accuracy = answered ? Math.round((correct / answered) * 100) : 0;
   const mastery = data?.status === "ok" ? Math.round((data.card.bin / 11) * 100) : 0;
   const selectedDeck = useMemo(() => decks.find((deck) => deck.id === deckId) ?? null, [decks, deckId]);
+  const hasMultipleDecks = decks.length > 1;
 
   const loadDecks = useCallback(async () => {
     try {
@@ -163,7 +164,24 @@ export default function Study() {
       </section>
 
       <section className="game-panel grid gap-5 p-5 sm:p-6 lg:grid-cols-[.9fr_1.4fr]">
-        <div><label className="metric-label" htmlFor="deck">Choose a deck</label><select id="deck" className="game-input mt-2" value={deckId ?? ""} onChange={(e) => chooseDeck(Number(e.target.value))}>{decks.map((deck) => <option key={deck.id} value={deck.id}>{deck.is_builtin ? "⭐ " : ""}{deck.title} · {deck.card_count}</option>)}</select><p className="mt-2 text-xs text-slate-500">⭐ is the public featured deck. Your private decks appear after sign in.</p></div>
+        <div>
+          <p className="metric-label">{hasMultipleDecks ? "Choose a deck" : "Featured deck"}</p>
+          {hasMultipleDecks ? (
+            <select id="deck" aria-label="Choose a deck" className="game-input mt-2" value={deckId ?? ""} onChange={(e) => chooseDeck(Number(e.target.value))}>
+              {decks.map((deck) => <option key={deck.id} value={deck.id}>{deck.is_builtin ? "⭐ " : ""}{deck.title} · {deck.card_count}</option>)}
+            </select>
+          ) : selectedDeck ? (
+            <div className="mt-2 rounded-xl border border-[#faa307]/30 bg-[#faa307]/[0.08] px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-black text-white">{selectedDeck.is_builtin ? "⭐ " : ""}{selectedDeck.title}</span>
+                <span className="text-xs font-bold text-[#ffba08]">{selectedDeck.card_count} cards</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-slate-400">Loading deck…</div>
+          )}
+          <p className="mt-2 text-xs text-slate-500">{user ? "Your private decks appear here beside the featured deck." : "This is the public featured deck. Sign in to add and switch between private decks."}</p>
+        </div>
         <div><p className="metric-label">Choose a mode</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{(Object.keys(trackCopy) as StudyTrack[]).map((value) => { const item = trackCopy[value]; const active = track === value; return <button key={value} className={`rounded-xl border p-3 text-left transition ${active ? "border-[#faa307]/70 bg-[#d00000]/20" : "border-white/10 bg-black/15 hover:border-[#f48c06]/40"}`} onClick={() => setTrack(value)}><span className="text-lg">{item.icon}</span><span className="ml-2 font-black text-white">{item.title}</span><span className="mt-1 block text-xs text-slate-400">{item.detail}</span></button>; })}</div></div>
       </section>
 

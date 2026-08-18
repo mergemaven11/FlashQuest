@@ -15,7 +15,7 @@ primary_region = 'atl'
 [env]
   PORT = "8080"
   APP_ENV = "production"
-  FRONTEND_URL = "https://flashcards-tobias.netlify.app"
+  FRONTEND_URL = "https://flaskquest.netlify.app"
   EMAIL_DELIVERY_MODE = "resend"
 
 [[vm]]
