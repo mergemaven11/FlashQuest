@@ -1,6 +1,6 @@
 site_name: FlashQuest’s
-site_description: Learn it. Break it. Fix it. Remember it — Platform Engineering study, labs, and operations.
-site_url: https://flashcards-docs.netlify.app/
+site_description: A reusable game-like study engine for concepts, break/fix labs, and spaced repetition.
+site_url: https://flashquest-docs.netlify.app/
 repo_name: mergemaven11/FlashQuest
 repo_url: https://github.com/mergemaven11/FlashQuest
 edit_uri: edit/main/docs/
@@ -64,6 +64,7 @@ extra_css:
 
 nav:
   - Home: index.md
+  - Open FlashQuest’s: https://flashcards-tobias.netlify.app/
   - Study:
       - Curriculum: CURRICULUM.md
       - Break/Fix Labs: LABS.md
