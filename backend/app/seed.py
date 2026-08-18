@@ -17,13 +17,16 @@ from typing import Any
 from sqlmodel import Session, select
 
 from .db import engine
-from .models import Card, Deck, UserCard
+from .models import Card, Deck, UserCard, utc_now
 
 DATA_DIR = Path(__file__).parent / "data"
 CONCEPT_DECK_PATH = DATA_DIR / "platform_engineering_cards.json"
 LAB_DECK_PATH = DATA_DIR / "platform_engineering_labs.json"
 PLATFORM_TOPIC = "Platform Engineering"
 PLATFORM_SLUG = "platform-engineering"
+PLATFORM_SUBJECT = "Technology"
+PLATFORM_DIFFICULTY = "intermediate"
+PLATFORM_TAGS = ["platform engineering", "devops", "cloud", "sre"]
 DEMO_USER_ID = 0
 
 
@@ -95,7 +98,7 @@ if len({prompt for prompt, _ in PLATFORM_ENGINEERING_DECK}) != len(
 
 
 def _featured_deck(session: Session) -> Deck:
-    """Create or repair the public featured Platform Engineering deck."""
+    """Create or repair the public Official Platform Engineering deck."""
     deck = session.exec(select(Deck).where(Deck.slug == PLATFORM_SLUG)).first()
     description = (
         "216 Platform Engineering challenges: 144 concepts and 72 hands-on "
@@ -108,16 +111,39 @@ def _featured_deck(session: Session) -> Deck:
             slug=PLATFORM_SLUG,
             description=description,
             is_builtin=True,
+            subject=PLATFORM_SUBJECT,
+            difficulty=PLATFORM_DIFFICULTY,
+            visibility="public",
+            tags=list(PLATFORM_TAGS),
         )
         session.add(deck)
         session.flush()
-    else:
-        deck.owner_id = None
-        deck.title = PLATFORM_TOPIC
-        deck.description = description
-        deck.is_builtin = True
+        deck.published_at = deck.created_at
         session.add(deck)
         session.flush()
+    else:
+        desired = {
+            "owner_id": None,
+            "title": PLATFORM_TOPIC,
+            "description": description,
+            "is_builtin": True,
+            "subject": PLATFORM_SUBJECT,
+            "difficulty": PLATFORM_DIFFICULTY,
+            "visibility": "public",
+            "tags": list(PLATFORM_TAGS),
+        }
+        changed = False
+        for field, value in desired.items():
+            if getattr(deck, field) != value:
+                setattr(deck, field, value)
+                changed = True
+        if deck.published_at is None:
+            deck.published_at = deck.created_at
+            changed = True
+        if changed:
+            deck.updated_at = utc_now()
+            session.add(deck)
+            session.flush()
     return deck
 
 
@@ -196,7 +222,7 @@ def run() -> None:
         result = seed_platform_deck(session)
 
     print(
-        "FlashQuest’s featured Platform Engineering deck ready: "
+        "FlashQuest featured Platform Engineering deck ready: "
         f"{result['deck_size']} cards "
         f"({result['concept_cards']} concepts + {result['lab_cards']} labs; "
         f"{result['inserted_cards']} inserted, "
