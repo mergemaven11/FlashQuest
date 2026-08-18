@@ -144,6 +144,7 @@ class ActivityRuntime:
     rounds: tuple[_ActivityRound, ...]
     round_index: int = 0
     participants: tuple[ActivityParticipantState, ...] = ()
+    round_result: dict[str, Any] | None = None
 
 
 BLITZ_DEFINITION = ActivityDefinition(
@@ -313,6 +314,98 @@ def build_activity_runtime(
     )
 
 
+def _participant(
+    runtime: ActivityRuntime, participant_id: str
+) -> ActivityParticipantState:
+    """Return one participant's current game-only score state."""
+    return next(
+        (
+            participant
+            for participant in runtime.participants
+            if participant.participant_id == participant_id
+        ),
+        ActivityParticipantState(participant_id=participant_id),
+    )
+
+
+def _with_participant(
+    runtime: ActivityRuntime, participant: ActivityParticipantState
+) -> tuple[ActivityParticipantState, ...]:
+    """Replace or append one participant in immutable runtime state."""
+    rows = [
+        current
+        for current in runtime.participants
+        if current.participant_id != participant.participant_id
+    ]
+    rows.append(participant)
+    return tuple(rows)
+
+
+def _score_blitz_response(
+    runtime: ActivityRuntime, event: ActivityEvent
+) -> ActivityRuntime:
+    """Score one Blitz choice without trusting the browser with the answer key."""
+    current = runtime.rounds[runtime.round_index]
+    choice_id = str(event.payload.get("choice_id") or "")
+    correct = choice_id == current.reveal["correct_choice_id"]
+    participant_id = event.participant_id or "solo"
+    participant = _participant(runtime, participant_id)
+    points = 100 if correct else 0
+    updated = participant.model_copy(
+        update={
+            "score": participant.score + points,
+            "streak": participant.streak + 1 if correct else 0,
+            "response": "correct" if correct else "wrong",
+            "round_complete": True,
+        }
+    )
+    return replace(
+        runtime,
+        phase=ActivityPhase.RESULT,
+        participants=_with_participant(runtime, updated),
+        round_result={"correct": correct, "points": points},
+    )
+
+
+def _score_match_response(
+    runtime: ActivityRuntime, event: ActivityEvent
+) -> ActivityRuntime:
+    """Score a Match board using the internal answer map."""
+    current = runtime.rounds[runtime.round_index]
+    raw_matches = event.payload.get("matches")
+    submitted = raw_matches if isinstance(raw_matches, dict) else {}
+    answer_map = current.reveal["answer_map"]
+    correct_count = sum(
+        1
+        for card_id, choice_id in answer_map.items()
+        if str(submitted.get(card_id) or "") == choice_id
+    )
+    total = len(answer_map)
+    points = round((correct_count / total) * 500) if total else 0
+    perfect = correct_count == total and total > 0
+    participant_id = event.participant_id or "solo"
+    participant = _participant(runtime, participant_id)
+    updated = participant.model_copy(
+        update={
+            "score": participant.score + points,
+            "streak": participant.streak + 1 if perfect else 0,
+            "response": f"{correct_count}/{total}",
+            "round_complete": True,
+        }
+    )
+    return replace(
+        runtime,
+        phase=ActivityPhase.RESULT,
+        participants=_with_participant(runtime, updated),
+        round_result={
+            "correct_count": correct_count,
+            "total": total,
+            "perfect": perfect,
+            "points": points,
+        },
+    )
+
+
 def public_activity_state(runtime: ActivityRuntime) -> ActivityPublicState:
     """Serialize only data safe for the runtime's current phase."""
     if runtime.phase == ActivityPhase.COMPLETE:
@@ -321,10 +414,13 @@ def public_activity_state(runtime: ActivityRuntime) -> ActivityPublicState:
     else:
         current = runtime.rounds[runtime.round_index]
         payload = current.payload
-        reveal = current.reveal if runtime.phase in {
-            ActivityPhase.REVEAL,
-            ActivityPhase.RESULT,
-        } else None
+        reveal = (
+            {**current.reveal, "result": runtime.round_result}
+            if runtime.phase == ActivityPhase.RESULT
+            else current.reveal
+            if runtime.phase == ActivityPhase.REVEAL
+            else None
+        )
 
     return ActivityPublicState(
         session_id=runtime.session_id,
@@ -343,24 +439,45 @@ def public_activity_state(runtime: ActivityRuntime) -> ActivityPublicState:
 
 
 def apply_activity_event(runtime: ActivityRuntime, event: ActivityEvent) -> ActivityRuntime:
-    """Apply a minimal deterministic lifecycle transition used by solo/room hosts."""
+    """Apply a deterministic lifecycle/game event used by solo and room hosts."""
+    if event.type == "response.submitted":
+        if runtime.phase not in {ActivityPhase.PROMPT, ActivityPhase.LOCKED}:
+            raise ValueError("response.submitted is only valid before reveal")
+        if runtime.definition.type == ActivityType.BLITZ:
+            return _score_blitz_response(runtime, event)
+        if runtime.definition.type == ActivityType.MATCH:
+            return _score_match_response(runtime, event)
+        raise ValueError(
+            f"No scoring adapter for activity type: {runtime.definition.type.value}"
+        )
     if event.type == "round.locked":
         return replace(runtime, phase=ActivityPhase.LOCKED)
     if event.type == "answer.revealed":
         if runtime.phase not in {ActivityPhase.PROMPT, ActivityPhase.LOCKED}:
             raise ValueError("answer.revealed is only valid during prompt/locked phases")
-        return replace(runtime, phase=ActivityPhase.REVEAL)
+        return replace(runtime, phase=ActivityPhase.REVEAL, round_result=None)
     if event.type == "round.completed":
         if runtime.phase not in {ActivityPhase.REVEAL, ActivityPhase.RESULT}:
             raise ValueError("round.completed requires a revealed round")
         next_index = runtime.round_index + 1
+        reset_participants = tuple(
+            participant.model_copy(update={"response": None, "round_complete": False})
+            for participant in runtime.participants
+        )
         if next_index >= len(runtime.rounds):
-            return replace(runtime, phase=ActivityPhase.COMPLETE)
+            return replace(
+                runtime,
+                phase=ActivityPhase.COMPLETE,
+                participants=reset_participants,
+                round_result=None,
+            )
         return replace(
             runtime,
             round_index=next_index,
             phase=ActivityPhase.PROMPT,
+            participants=reset_participants,
+            round_result=None,
         )
     if event.type == "session.completed":
-        return replace(runtime, phase=ActivityPhase.COMPLETE)
+        return replace(runtime, phase=ActivityPhase.COMPLETE, round_result=None)
     raise ValueError(f"Unsupported activity event: {event.type}")
