@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.exc import IntegrityError
@@ -76,7 +77,7 @@ def signup(payload: SignupRequest, session: Session = Depends(get_session)) -> d
     raw = create_verification_token(session, user)
     try:
         send_verification_email(user, raw)
-    except (RuntimeError, httpx.HTTPError) as exc:  # type: ignore[name-defined]
+    except (RuntimeError, httpx.HTTPError) as exc:
         raise HTTPException(
             status_code=503,
             detail="Account created, but the verification email could not be sent. Use resend verification.",
@@ -98,7 +99,7 @@ def resend_verification(payload: dict, session: Session = Depends(get_session)) 
         raw = create_verification_token(session, user)
         try:
             send_verification_email(user, raw)
-        except Exception as exc:
+        except (RuntimeError, httpx.HTTPError) as exc:
             raise HTTPException(
                 status_code=503, detail="Verification email service is unavailable"
             ) from exc
