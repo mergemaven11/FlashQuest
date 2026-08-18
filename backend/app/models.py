@@ -1,4 +1,4 @@
-"""Database and API models for FlashQuest’s reusable study engine."""
+"""Database and API models for FlashQuest's reusable study engine."""
 
 from __future__ import annotations
 
@@ -76,23 +76,39 @@ class DeckBase(SQLModel):
 class DeckCreate(DeckBase):
     """Payload for a verified user to create a custom deck."""
 
+    subject: str = "General"
+    difficulty: str = "beginner"
+    tags: list[str] = Field(default_factory=list)
+
 
 class DeckUpdate(SQLModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    subject: Optional[str] = None
+    difficulty: Optional[str] = None
+    tags: Optional[list[str]] = None
 
 
 class DeckRead(DeckBase):
     id: int
     slug: str
     is_builtin: bool
+    is_official: bool = False
     owner_id: Optional[int]
+    creator_display_name: Optional[str] = None
+    subject: str
+    difficulty: str
+    visibility: str
+    tags: list[str]
+    published_at: Optional[datetime] = None
+    source_deck_id: Optional[int] = None
     card_count: int = 0
     created_at: datetime
+    updated_at: datetime
 
 
 class Deck(SQLModel, table=True):
-    """A topic pack. Built-ins are public; custom decks belong to one user."""
+    """A topic pack that can stay private or become a Library deck."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     owner_id: Optional[int] = Field(
@@ -102,7 +118,21 @@ class Deck(SQLModel, table=True):
     slug: str = Field(index=True, sa_type=sa.String)
     description: str = Field(default="", sa_type=sa.String)
     is_builtin: bool = Field(default=False, index=True, sa_type=sa.Boolean)
+    subject: str = Field(default="General", index=True, sa_type=sa.String)
+    difficulty: str = Field(default="beginner", index=True, sa_type=sa.String)
+    visibility: str = Field(default="private", index=True, sa_type=sa.String)
+    tags: list[str] = Field(
+        default_factory=list,
+        sa_column=sa.Column(sa.JSON, nullable=False),
+    )
+    published_at: Optional[datetime] = Field(
+        default=None, index=True, sa_type=sa.DateTime(timezone=True)
+    )
+    source_deck_id: Optional[int] = Field(
+        default=None, foreign_key="deck.id", index=True, sa_type=sa.Integer
+    )
     created_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
+    updated_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
 
 
 class CardBase(SQLModel):
