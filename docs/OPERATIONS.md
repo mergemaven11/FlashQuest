@@ -1,6 +1,6 @@
 # Operations & deployment ⚙️
 
-This page is the runbook for operating FlashQuest’s locally and understanding its deployment boundaries.
+This is the runbook for operating FlashQuest’s locally and understanding the production boundaries between the React app, FastAPI, PostgreSQL, email verification, Netlify, and Fly.io.
 
 ## Runtime topology
 
@@ -8,20 +8,25 @@ This page is the runbook for operating FlashQuest’s locally and understanding 
 browser
   │
   ▼
-web (React/Nginx)
+React / Netlify
+  │ HTTPS + bearer session
+  ▼
+FastAPI / Fly.io
+  │
+  ├── Resend API (verification email)
   │
   ▼
-api (FastAPI/Uvicorn)
-  │
-  ▼
-db (PostgreSQL 16)
+PostgreSQL
 ```
 
-Docker Compose enforces dependency-aware startup:
+The data plane stores:
 
-1. PostgreSQL starts and passes `pg_isready`.
-2. The API starts only after the database is healthy.
-3. The web container starts only after the API passes `/health/ready`.
+- accounts and verification state;
+- hashed opaque auth sessions;
+- featured and user-owned decks;
+- cards;
+- per-user mastery state;
+- review history.
 
 ---
 
@@ -34,20 +39,20 @@ cd FlashQuest
 docker compose up --build -d
 ```
 
-Apply the schema explicitly:
+Apply the schema:
 
 ```bash
 docker compose exec api \
   alembic -c /app/alembic.ini upgrade head
 ```
 
-Seed the built-in curriculum:
+Seed the featured Platform Engineering deck:
 
 ```bash
 docker compose exec api python -m app.seed
 ```
 
-Verify all three services:
+Verify:
 
 ```bash
 docker compose ps
@@ -55,226 +60,309 @@ curl http://localhost:8080/health/live
 curl http://localhost:8080/health/ready
 ```
 
-Open the application at `http://localhost:5173`.
+Open:
+
+- app: `http://localhost:5173`
+- API docs: `http://localhost:8080/docs`
 
 !!! important "Migrate before seeding"
-    FlashQuest’s does not silently mutate the schema on API startup. On a fresh database, run Alembic before the curriculum seeder.
+    The API does not silently create tables at process startup. Alembic owns schema lifecycle; the curriculum seeder owns featured starter data.
+
+---
+
+## Featured seed lifecycle
+
+The seeder is **idempotent**. Running it repeatedly:
+
+1. creates or repairs the built-in `Platform Engineering` deck;
+2. inserts missing cards;
+3. repairs built-in metadata and deck membership;
+4. creates missing anonymous-demo progress rows;
+5. does not duplicate existing content.
+
+The featured deck contains **216 cards: 144 concepts + 72 labs**.
+
+Fly’s release command is configured to run:
+
+```text
+alembic upgrade head && python -m app.seed
+```
+
+That means a backend release applies the schema before repairing the featured content.
 
 ---
 
 ## Health semantics
 
-| Endpoint | Meaning | Database required? |
+| Endpoint | Meaning | PostgreSQL required? |
 | --- | --- | --- |
-| `GET /health` | lightweight backwards-compatible health response | No |
-| `GET /health/live` | process/service is alive; includes service metadata | No |
-| `GET /health/ready` | API can serve traffic including critical DB access | **Yes** |
+| `GET /health` | lightweight backwards-compatible process health | No |
+| `GET /health/live` | process is alive + service metadata | No |
+| `GET /health/ready` | API can execute a database query | **Yes** |
 
-A process can be alive while the service is not ready. This distinction lets an orchestrator avoid sending traffic to an API that cannot reach PostgreSQL without treating every dependency outage as a crashed process.
-
-### Quick diagnosis
+A live process can still be unready when PostgreSQL is unavailable.
 
 ```bash
 curl -i http://localhost:8080/health/live
 curl -i http://localhost:8080/health/ready
 ```
 
-If liveness succeeds but readiness returns `503`, investigate PostgreSQL connectivity before restarting the API blindly.
+If liveness succeeds but readiness returns `503`, investigate the database/network path before restarting the API blindly.
 
 ---
 
-## Request diagnostics
+## Runtime configuration
 
-Every API response includes:
+| Variable | Purpose | Secret? |
+| --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL / SQLAlchemy connection string | Usually |
+| `APP_ENV` | runtime environment label | No |
+| `APP_VERSION` | API version metadata | No |
+| `LOG_LEVEL` | logging configuration | No |
+| `ALLOWED_ORIGINS` | extra CORS browser origins | No |
+| `ACCESS_TOKEN_MINUTES` | opaque bearer-session lifetime | No |
+| `FRONTEND_URL` | base URL used in verification links | No |
+| `EMAIL_DELIVERY_MODE` | `console` locally or `resend` hosted | No |
+| `RESEND_API_KEY` | Resend API credential | **Yes** |
+| `EMAIL_FROM` | verification sender identity | No |
+| `VERIFICATION_TOKEN_MINUTES` | email-link lifetime | No |
+| `DEMO_DELETE_PASSWORD` | owner-only built-in deletion/reset guard | **Yes** |
+| `VITE_API_URL` | FastAPI URL compiled into React | No |
+
+Do not commit production credentials to the repository.
+
+### Hosted email verification
+
+Fly is configured for:
 
 ```text
-X-Request-ID
-X-Response-Time-Ms
+EMAIL_DELIVERY_MODE=resend
+FRONTEND_URL=https://flashcards-tobias.netlify.app
 ```
 
-If a client sends `X-Request-ID`, the API propagates it. Otherwise FlashQuest’s generates one.
-
-Use that ID to correlate a user-facing failure with API or proxy logs.
+Before enabling public signup, configure the provider secret and demo-owner secret:
 
 ```bash
-curl -i \
-  -H 'X-Request-ID: lab-incident-001' \
-  http://localhost:8080/health/live
+fly secrets set \
+  RESEND_API_KEY='...' \
+  DEMO_DELETE_PASSWORD='...' \
+  -a flashcards-tobias
 ```
+
+You should also configure `EMAIL_FROM` to a sender/domain accepted by your Resend account.
+
+!!! warning "Signup depends on email delivery"
+    If the hosted API is in `resend` mode without a working `RESEND_API_KEY`, the account row can be created but delivery returns a service error. Once the provider is configured, the user can request **Resend verification**.
 
 ---
 
-## Useful Docker commands
+## Authentication diagnostics
 
-### Service state
+### User cannot sign in
 
-```bash
-docker compose ps
+Check:
+
+1. the account exists;
+2. email is verified;
+3. the password matches;
+4. bearer session has not expired/revoked;
+5. browser requests contain `Authorization: Bearer ...`.
+
+### Verification email never arrives
+
+Check:
+
+1. `EMAIL_DELIVERY_MODE`;
+2. `RESEND_API_KEY` is present in Fly secrets;
+3. `EMAIL_FROM` is allowed by the provider;
+4. `FRONTEND_URL` points at the current app URL;
+5. Fly/API logs for provider HTTP errors.
+
+Local mode intentionally prints the verification URL to the API logs:
+
+```text
+EMAIL_DELIVERY_MODE=console
 ```
 
-### API logs
+### Verification link expired
 
-```bash
-docker compose logs --tail=200 api
-```
+Links are one-time tokens and expire. Use the **Resend verification** flow to create a fresh token; older unused links are invalidated.
 
-### PostgreSQL logs
+---
 
-```bash
-docker compose logs --tail=200 db
-```
+## Deck ownership and demo protection
 
-### Follow logs
+The built-in Platform Engineering deck is public to read/study. Custom decks belong to their verified creator.
 
-```bash
-docker compose logs -f api db
-```
+API boundaries enforce:
 
-### Restart one service
+- anonymous users see built-in content only;
+- signed-in users see built-ins + their own decks;
+- users can mutate only their own custom decks/cards;
+- featured content is read-only through normal user routes;
+- destructive maintenance on built-ins requires the server-side demo password.
 
-```bash
-docker compose restart api
-```
-
-### Stop the stack
-
-```bash
-docker compose down
-```
-
-### Destroy the local database volume
-
-```bash
-docker compose down -v
-```
-
-!!! warning "`down -v` deletes local database state"
-    Use it only when you intentionally want a clean local PostgreSQL volume. Afterward repeat **start → migrate → seed → verify**.
+The demo password is never compiled into the React bundle.
 
 ---
 
 ## Database lifecycle
 
-### Current migration
+Inspect migration state:
 
 ```bash
 docker compose exec api \
   alembic -c /app/alembic.ini current
 ```
 
-### Upgrade to head
+Upgrade:
 
 ```bash
 docker compose exec api \
   alembic -c /app/alembic.ini upgrade head
 ```
 
-### Create a migration after model changes
+Create a migration after changing persistent models:
 
 ```bash
 docker compose exec api \
   alembic -c /app/alembic.ini revision --autogenerate -m "describe change"
 ```
 
-CI provisions a clean PostgreSQL 16 service and upgrades it to Alembic `head`, catching migrations that only work against a developer’s existing database.
+CI provisions clean PostgreSQL 16 and runs `alembic upgrade head` so migration failures are caught before merge.
 
 ---
 
-## Runtime configuration
+## Request diagnostics
 
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL / SQLAlchemy connection string |
-| `APP_ENV` | runtime environment label |
-| `APP_VERSION` | service version returned by operational metadata |
-| `LOG_LEVEL` | application logging level/configuration input |
-| `ALLOWED_ORIGINS` | browser origins allowed through CORS |
-| `VITE_API_URL` | API base URL compiled into the React frontend |
-
-Keep environment-specific credentials and secrets outside the repository.
-
----
-
-## CI gates
-
-The application pipeline validates:
-
-- backend compilation and tests on Python 3.11 and 3.12;
-- Ruff correctness checks;
-- Black formatting checks for upgraded platform code;
-- frontend ESLint + TypeScript/Vite build;
-- Alembic migration against clean PostgreSQL 16;
-- Docker Compose configuration;
-- API and web container builds.
-
-The docs pipeline separately builds MkDocs + TypeDoc, keeping documentation failures isolated from application CI while still blocking broken docs changes in pull requests.
-
----
-
-## Netlify docs deployment
-
-The **root `netlify.toml` is the documentation deployment**, not the React application deployment.
-
-Its docs build:
-
-1. creates a Python virtual environment;
-2. installs MkDocs Material and mkdocstrings;
-3. installs backend requirements so Python API references can import;
-4. runs the frontend TypeDoc generation;
-5. runs `mkdocs build --strict`;
-6. publishes the generated `site/` directory.
-
-The config also uses a content-change filter. A Netlify deploy may be **canceled intentionally** when none of these paths changed:
+API responses include:
 
 ```text
-mkdocs.yml
-docs/
-frontend/
-backend/
-.github/workflows/
+X-Request-ID
+X-Response-Time-Ms
 ```
 
-That “canceled due to no content change” result is an optimization, not a build failure.
+Send a known request id when reproducing a problem:
 
-### React application deployment
+```bash
+curl -i \
+  -H 'X-Request-ID: debug-001' \
+  http://localhost:8080/health/live
+```
 
-Treat the React application as a separate web deployment concern. For a Netlify site that hosts the app itself:
+Use the same id to correlate client symptoms with API/proxy logs.
+
+---
+
+## Docker commands
+
+```bash
+# state
+docker compose ps
+
+# API logs
+docker compose logs --tail=200 api
+
+# DB logs
+docker compose logs --tail=200 db
+
+# follow both
+docker compose logs -f api db
+
+# stop
+docker compose down
+```
+
+Destroy the local database only when you intentionally want a clean environment:
+
+```bash
+docker compose down -v
+```
+
+Then repeat **start → migrate → seed → verify**.
+
+---
+
+## Netlify deployments
+
+FlashQuest’s has two separate Netlify concerns:
+
+### React application
 
 ```text
+Site: flashcards-tobias
 Base directory: frontend
 Build command: npm run build
 Publish directory: dist
+VITE_API_URL: https://flashcards-tobias.fly.dev
 ```
 
-Set `VITE_API_URL` to the deployed FastAPI base URL for that application site.
+### MkDocs documentation
 
-!!! note "Docs and app are intentionally separate"
-    The root Netlify config publishes MkDocs to `site/`. Do not repurpose it as the React app deployment by changing its publish directory to `frontend/dist`; that would collapse two different deployment concerns into one config.
+```text
+Site: flashquest-docs
+URL: https://flashquest-docs.netlify.app/
+Publish directory: site
+```
+
+The root `netlify.toml` belongs to **MkDocs**, not the React application.
+
+A docs deploy may be intentionally skipped/canceled when no docs-relevant paths changed. That optimization is not itself a build failure.
 
 ---
 
-## Failure triage cheatsheet
+## Fly deployment boundary
+
+Netlify deploying the React bundle **does not migrate PostgreSQL**.
+
+The account/deck schema and featured seed become production-ready only after the corresponding backend commit is deployed to Fly. Fly then executes the configured release command before starting the new app version.
+
+For this V1, production rollout order is:
+
+1. configure required Fly secrets;
+2. deploy FastAPI/Fly commit;
+3. confirm migration + seed release command succeeded;
+4. verify `/health/ready`;
+5. deploy/confirm React frontend;
+6. test signup → verification → login → create deck;
+7. confirm MkDocs deployment.
+
+---
+
+## CI quality gates
+
+Application CI validates:
+
+- Python 3.11/3.12 tests;
+- Ruff correctness checks;
+- Black checks for upgraded backend code;
+- frontend ESLint + production Vite build;
+- clean PostgreSQL migration to Alembic `head`;
+- Compose configuration;
+- API/web container builds.
+
+Documentation CI separately runs MkDocs + TypeDoc with strict build checking.
+
+---
+
+## Failure triage
 
 | Symptom | First checks |
 | --- | --- |
-| Web page unavailable | `docker compose ps`, web logs, frontend build/deploy status |
-| API returns connection errors | `/health/live`, `/health/ready`, API logs, `DATABASE_URL` |
-| API live but not ready | PostgreSQL health/logs, network/DNS between API and DB |
-| Fresh DB has missing tables | Alembic `current`, then `upgrade head` |
-| No study cards | run `python -m app.seed`, inspect seed output |
-| Netlify docs deploy skipped | check whether docs-relevant paths actually changed |
-| Docs build fails | run `mkdocs build --strict`; inspect TypeDoc/MkDocs import errors |
-| Container image build fails | reproduce the failing Docker build and inspect the first failed layer |
+| Play shows `Network Error` | `VITE_API_URL`, Fly health, CORS, browser network tab |
+| API live but not ready | PostgreSQL health/network/`DATABASE_URL` |
+| Featured deck empty | migration state, release seed output, `python -m app.seed` |
+| Signup 503 after account creation | Resend key/sender/provider logs |
+| Login 403 | email verification state |
+| Custom deck invisible | bearer session + ownership scope |
+| User cannot modify a card | deck ownership / built-in protection |
+| Docs old after merge | Netlify `flashquest-docs` production deploy status |
+| Migration fails | first failing Alembic revision on clean PostgreSQL |
 
----
-
-## Operational principle
-
-The safest recovery loop is:
+The operational loop remains:
 
 **observe → narrow → mitigate → verify → prevent**
 
-Restarting can be a mitigation, but it should not replace understanding the failure signal.
-
-[Architecture decisions →](PLATFORM_ENGINEERING.md){ .md-button }
-[Practice break/fix scenarios →](LABS.md){ .md-button .md-button--primary }
+[Account model →](AUTHENTICATION.md){ .md-button }
+[Custom decks →](MAKE_YOUR_OWN_DECK.md){ .md-button }
+[Architecture →](PLATFORM_ENGINEERING.md){ .md-button .md-button--primary }
