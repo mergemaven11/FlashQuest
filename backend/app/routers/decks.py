@@ -10,10 +10,21 @@ from sqlalchemy import func
 from sqlmodel import Session, delete, select
 
 from ..db import get_session
-from ..models import Card, Deck, DeckCreate, DeckRead, DeckUpdate, Review, User, UserCard
+from ..models import (
+    Card,
+    Deck,
+    DeckCreate,
+    DeckRead,
+    DeckUpdate,
+    Review,
+    User,
+    UserCard,
+    utc_now,
+)
 from ..security import get_current_user, require_verified_user
 
 router = APIRouter(prefix="/decks", tags=["decks"])
+VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced", "expert"}
 
 
 def _slugify(value: str) -> str:
@@ -31,6 +42,41 @@ def _unique_slug(session: Session, title: str, owner_id: int) -> str:
     return candidate
 
 
+def _clean_subject(value: str) -> str:
+    subject = " ".join(value.strip().split())
+    if not subject:
+        raise HTTPException(status_code=422, detail="Subject cannot be empty")
+    if len(subject) > 80:
+        raise HTTPException(status_code=422, detail="Subject is too long")
+    return subject
+
+
+def _clean_difficulty(value: str) -> str:
+    difficulty = value.strip().lower()
+    if difficulty not in VALID_DIFFICULTIES:
+        raise HTTPException(
+            status_code=422,
+            detail="Difficulty must be beginner, intermediate, advanced, or expert",
+        )
+    return difficulty
+
+
+def _normalize_tags(values: list[str]) -> list[str]:
+    tags: list[str] = []
+    seen: set[str] = set()
+    for raw in values:
+        tag = " ".join(raw.strip().lower().split())
+        if not tag or tag in seen:
+            continue
+        if len(tag) > 40:
+            raise HTTPException(status_code=422, detail="Tags must be 40 characters or fewer")
+        tags.append(tag)
+        seen.add(tag)
+        if len(tags) > 12:
+            raise HTTPException(status_code=422, detail="A deck can have at most 12 tags")
+    return tags
+
+
 def _card_count(session: Session, deck_id: int) -> int:
     count = session.exec(
         select(func.count()).select_from(Card).where(Card.deck_id == deck_id)
@@ -39,15 +85,29 @@ def _card_count(session: Session, deck_id: int) -> int:
 
 
 def _read(session: Session, deck: Deck) -> DeckRead:
+    creator_display_name = None
+    if deck.owner_id is not None:
+        creator = session.get(User, deck.owner_id)
+        creator_display_name = creator.display_name if creator is not None else None
+
     return DeckRead(
         id=int(deck.id or 0),
         owner_id=deck.owner_id,
+        creator_display_name=creator_display_name,
         title=deck.title,
         slug=deck.slug,
         description=deck.description,
         is_builtin=deck.is_builtin,
+        is_official=deck.is_builtin,
+        subject=deck.subject,
+        difficulty=deck.difficulty,
+        visibility=deck.visibility,
+        tags=list(deck.tags or []),
+        published_at=deck.published_at,
+        source_deck_id=deck.source_deck_id,
         card_count=_card_count(session, int(deck.id or 0)),
         created_at=deck.created_at,
+        updated_at=deck.updated_at,
     )
 
 
@@ -62,7 +122,7 @@ def _owned_deck(session: Session, deck_id: int, user_id: int) -> Deck:
 
 @router.get("/featured", response_model=list[DeckRead])
 def featured_decks(session: Session = Depends(get_session)) -> list[DeckRead]:
-    """Return public starter/demo decks. Platform Engineering is the first one."""
+    """Return public Official starter/demo decks."""
     decks = session.exec(
         select(Deck).where(Deck.is_builtin == True).order_by(Deck.id)  # noqa: E712
     ).all()
@@ -86,7 +146,7 @@ def create_deck(
     user: User = Depends(require_verified_user),
     session: Session = Depends(get_session),
 ) -> DeckRead:
-    """Create an empty reusable study deck for a verified user."""
+    """Create an empty private reusable study deck for a verified user."""
     title = payload.title.strip()
     if len(title) < 2:
         raise HTTPException(status_code=422, detail="Deck title is too short")
@@ -96,6 +156,10 @@ def create_deck(
         slug=_unique_slug(session, title, int(user.id or 0)),
         description=payload.description.strip(),
         is_builtin=False,
+        subject=_clean_subject(payload.subject),
+        difficulty=_clean_difficulty(payload.difficulty),
+        visibility="private",
+        tags=_normalize_tags(payload.tags),
     )
     session.add(deck)
     session.commit()
@@ -110,7 +174,7 @@ def update_deck(
     user: User = Depends(require_verified_user),
     session: Session = Depends(get_session),
 ) -> DeckRead:
-    """Rename or describe an owned deck."""
+    """Update editable metadata for an owned deck without changing visibility."""
     deck = _owned_deck(session, deck_id, int(user.id or 0))
     if payload.title is not None:
         title = payload.title.strip()
@@ -119,6 +183,13 @@ def update_deck(
         deck.title = title
     if payload.description is not None:
         deck.description = payload.description.strip()
+    if payload.subject is not None:
+        deck.subject = _clean_subject(payload.subject)
+    if payload.difficulty is not None:
+        deck.difficulty = _clean_difficulty(payload.difficulty)
+    if payload.tags is not None:
+        deck.tags = _normalize_tags(payload.tags)
+    deck.updated_at = utc_now()
     session.add(deck)
     session.commit()
     session.refresh(deck)
@@ -131,7 +202,7 @@ def copy_featured_deck(
     user: User = Depends(require_verified_user),
     session: Session = Depends(get_session),
 ) -> DeckRead:
-    """Copy a featured deck so a user can customize it safely."""
+    """Copy an Official deck into a private user-owned remix."""
     source = session.get(Deck, deck_id)
     if source is None or not source.is_builtin:
         raise HTTPException(status_code=404, detail="Featured deck not found")
@@ -143,6 +214,11 @@ def copy_featured_deck(
         slug=_unique_slug(session, title, int(user.id or 0)),
         description=source.description,
         is_builtin=False,
+        subject=source.subject,
+        difficulty=source.difficulty,
+        visibility="private",
+        tags=list(source.tags or []),
+        source_deck_id=source.id,
     )
     session.add(target)
     session.flush()
