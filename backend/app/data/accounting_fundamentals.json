@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "name": "Accounting Fundamentals",
+  "card_count": 30,
+  "domains": [
+    {
+      "name": "Accounting Equation",
+      "cards": [
+        {"prompt": "Accounting · What is the basic accounting equation?", "answer": "Assets = Liabilities + Equity. It expresses how an entity's resources are financed by creditors and owners."},
+        {"prompt": "Accounting · What is an asset?", "answer": "An asset is a resource controlled by an entity that is expected to provide future economic benefit, such as cash, inventory, or equipment."},
+        {"prompt": "Accounting · What is a liability?", "answer": "A liability is a present obligation to transfer economic resources, such as accounts payable, wages payable, or a loan balance."},
+        {"prompt": "Accounting · What is owner's or shareholders' equity?", "answer": "Equity is the residual interest in assets after liabilities are deducted; it generally reflects owner investment and accumulated results retained in the business."},
+        {"prompt": "Accounting · How does earning revenue generally affect equity?", "answer": "Revenue generally increases net income and therefore increases retained earnings or owner's equity, assuming no offsetting distribution."},
+        {"prompt": "Accounting · How does an expense generally affect equity?", "answer": "An expense reduces net income and therefore generally reduces retained earnings or owner's equity."}
+      ]
+    },
+    {
+      "name": "Debits & Credits",
+      "cards": [
+        {"prompt": "Accounting · What is double-entry accounting?", "answer": "Every recorded transaction affects at least two accounts, with total debits equal to total credits so the accounting equation remains balanced."},
+        {"prompt": "Accounting · On which side do asset accounts normally increase?", "answer": "Asset accounts normally increase with debits and decrease with credits."},
+        {"prompt": "Accounting · On which side do liability accounts normally increase?", "answer": "Liability accounts normally increase with credits and decrease with debits."},
+        {"prompt": "Accounting · On which side does equity normally increase?", "answer": "Equity accounts normally increase with credits, although specific contra-equity accounts follow the opposite pattern."},
+        {"prompt": "Accounting · On which side do expense accounts normally increase?", "answer": "Expense accounts normally increase with debits because expenses reduce equity through net income."},
+        {"prompt": "Accounting · What is a journal entry?", "answer": "A journal entry is a dated record of a transaction showing the accounts affected, debit and credit amounts, and often a short explanation."}
+      ]
+    },
+    {
+      "name": "Financial Statements",
+      "cards": [
+        {"prompt": "Accounting · What does the income statement report?", "answer": "It reports revenues, expenses, and resulting profit or loss over a period of time."},
+        {"prompt": "Accounting · What does the balance sheet report?", "answer": "It reports assets, liabilities, and equity at a specific point in time."},
+        {"prompt": "Accounting · What does the statement of cash flows explain?", "answer": "It explains cash inflows and outflows during a period, commonly grouped into operating, investing, and financing activities."},
+        {"prompt": "Accounting · What does the statement of retained earnings or changes in equity show?", "answer": "It reconciles changes in equity over a period, including profit or loss, owner contributions, distributions, and other applicable equity movements."},
+        {"prompt": "Accounting · Why is net income not the same thing as cash flow?", "answer": "Accrual accounting recognizes some revenues and expenses before or after the related cash moves, so profit and cash can differ in the same period."},
+        {"prompt": "Accounting · How are the financial statements connected?", "answer": "Net income affects equity, ending balance-sheet accounts feed the statement of financial position, and cash-flow reporting explains the change in cash between balance-sheet dates."}
+      ]
+    },
+    {
+      "name": "Accruals & Adjustments",
+      "cards": [
+        {"prompt": "Accounting · What is accrual accounting?", "answer": "Accrual accounting recognizes economic events when they are earned or incurred according to applicable accounting rules, rather than only when cash is received or paid."},
+        {"prompt": "Accounting · What is an accrued expense?", "answer": "It is an expense that has been incurred but not yet paid or fully recorded, creating an expense and usually a related liability."},
+        {"prompt": "Accounting · What is accrued revenue?", "answer": "It is revenue that has been earned before the customer has paid or sometimes before an invoice has been issued, generally creating a receivable."},
+        {"prompt": "Accounting · What is deferred or unearned revenue?", "answer": "It is cash received before the related revenue has been earned, so it is generally recorded as a liability until the performance obligation is satisfied."},
+        {"prompt": "Accounting · What is a prepaid expense?", "answer": "It is a payment made before the related benefit is consumed, initially recorded as an asset and expensed over the periods that receive the benefit."},
+        {"prompt": "Accounting · Why are adjusting entries made at period end?", "answer": "They update accounts for items such as accruals, deferrals, depreciation, and estimates so revenues, expenses, assets, and liabilities reflect the reporting period appropriately."}
+      ]
+    },
+    {
+      "name": "Cash, Inventory & Analysis",
+      "cards": [
+        {"prompt": "Accounting · What is accounts receivable?", "answer": "Accounts receivable is an asset representing amounts customers owe the business for goods or services already provided on credit."},
+        {"prompt": "Accounting · What is accounts payable?", "answer": "Accounts payable is a liability representing amounts the business owes suppliers for goods or services already received on credit."},
+        {"prompt": "Accounting · What is cost of goods sold?", "answer": "Cost of goods sold is the cost assigned to inventory that was sold during the period and is recognized as an expense when the related sale is recognized."},
+        {"prompt": "Accounting · What is gross profit?", "answer": "Gross profit is sales revenue minus cost of goods sold before operating expenses and other items."},
+        {"prompt": "Accounting · What does the current ratio measure?", "answer": "Current ratio = current assets ÷ current liabilities; it is a basic indicator of short-term liquidity, though interpretation depends on the business and industry."},
+        {"prompt": "Accounting · Why is a bank reconciliation performed?", "answer": "It explains differences between the company's cash records and the bank statement, identifying timing differences, bank items, errors, or transactions that still need to be recorded."}
+      ]
+    }
+  ]
+}
