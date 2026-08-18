@@ -1,5 +1,5 @@
 site_name: FlashQuest’s
-site_description: A reusable game-like study engine for concepts, break/fix labs, and spaced repetition.
+site_description: A reusable game-like study engine with a featured Platform Engineering deck, private custom decks, and spaced repetition.
 site_url: https://flashquest-docs.netlify.app/
 repo_name: mergemaven11/FlashQuest
 repo_url: https://github.com/mergemaven11/FlashQuest
@@ -21,15 +21,15 @@ theme:
   palette:
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep purple
-      accent: cyan
+      primary: black
+      accent: amber
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep purple
-      accent: cyan
+      primary: deep orange
+      accent: amber
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
@@ -65,10 +65,13 @@ extra_css:
 nav:
   - Home: index.md
   - Open FlashQuest’s: https://flashcards-tobias.netlify.app/
-  - Study:
+  - Product:
+      - Make Your Own Deck: MAKE_YOUR_OWN_DECK.md
+      - Accounts & Email Verification: AUTHENTICATION.md
+  - Featured Platform Engineering:
       - Curriculum: CURRICULUM.md
       - Break/Fix Labs: LABS.md
-  - Platform Engineering:
+  - Engineering:
       - Architecture & Design: PLATFORM_ENGINEERING.md
       - Operations & Deployment: OPERATIONS.md
   - Reference:
