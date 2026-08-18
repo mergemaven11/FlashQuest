@@ -1,3 +1,5 @@
+import type { ExperiencePolicy } from "./experienceContext";
+
 export type ActivityType =
   | "blitz"
   | "match"
@@ -74,4 +76,19 @@ export interface ActivityPublicState {
  */
 export function isActivityRevealed(state: ActivityPublicState): boolean {
   return state.phase === "reveal" || state.phase === "result";
+}
+
+/**
+ * Resolve an activity's timer against the learner's current presentation policy.
+ * Required timers remain part of games whose rules depend on them; optional
+ * timers disappear in Chill/Focus mode without changing the underlying deck or
+ * durable progress.
+ */
+export function shouldUseActivityTimer(
+  definition: ActivityDefinition,
+  policy: ExperiencePolicy
+): boolean {
+  if (definition.timer_policy === "required") return true;
+  if (definition.timer_policy === "none") return false;
+  return policy.allowOptionalTimers;
 }
