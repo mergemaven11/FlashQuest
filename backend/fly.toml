@@ -1,6 +1,7 @@
 # fly.toml app configuration file generated on 2025-08-19T14:38:34-04:00
 #
 # See https://fly.io/docs/reference/configuration/ for information on this file.
+# Production deploys are triggered from GitHub Actions on pushes to main.
 
 app = 'flashcards-tobias'
 primary_region = 'atl'
