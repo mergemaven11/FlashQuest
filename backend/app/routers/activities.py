@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from threading import Lock
 from time import monotonic
 
@@ -170,12 +170,7 @@ def start_activity(
 
     # Runtime adapters are deterministic by seed, while HTTP sessions need a
     # collision-resistant capability id so two learners can replay one seed safely.
-    runtime = ActivityRuntime(
-        **{
-            **runtime.__dict__,
-            "session_id": secrets.token_urlsafe(18),
-        }
-    )
+    runtime = replace(runtime, session_id=secrets.token_urlsafe(18))
     _store(runtime, owner_key)
     return public_activity_state(runtime)
 
