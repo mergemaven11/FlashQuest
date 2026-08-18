@@ -15,6 +15,7 @@ import type {
 
 export type StudyTrack = "mixed" | "concept" | "lab";
 const TOKEN_KEY = "flashquest-access-token";
+const DEMO_SESSION_KEY = "flashquest-demo-session";
 
 export const BIN_DELAYS: Record<number, number> = {
   0: 0,
@@ -66,6 +67,18 @@ export function setAccessToken(token: string | null): void {
   else window.localStorage.removeItem(TOKEN_KEY);
 }
 
+function getDemoSessionId(): string | null {
+  if (typeof window === "undefined") return null;
+  let sessionId = window.sessionStorage.getItem(DEMO_SESSION_KEY);
+  if (!sessionId) {
+    sessionId = typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.sessionStorage.setItem(DEMO_SESSION_KEY, sessionId);
+  }
+  return sessionId;
+}
+
 export const api = axios.create({
   baseURL: apiBaseURL(),
   timeout: 12_000,
@@ -75,7 +88,12 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = typeof window !== "undefined" ? getAccessToken() : null;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    const demoSession = getDemoSessionId();
+    if (demoSession) config.headers["X-Demo-Session"] = demoSession;
+  }
   return config;
 });
 
@@ -215,11 +233,16 @@ export async function deleteDeck(deckId: number): Promise<void> {
 
 export async function getStudyNext(
   track: StudyTrack = "mixed",
-  deckId?: number
+  deckId?: number,
+  excludeCardIds: number[] = []
 ): Promise<StudyNext> {
   try {
     const { data } = await api.get<StudyNext>("/study/next", {
-      params: { track, deck_id: deckId },
+      params: {
+        track,
+        deck_id: deckId,
+        exclude_card_ids: excludeCardIds.length ? excludeCardIds.join(",") : undefined,
+      },
     });
     return data;
   } catch (e) {
