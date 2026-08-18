@@ -26,10 +26,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy API
-        run: flyctl deploy --remote-only
+        run: flyctl deploy --remote-only --config fly.toml -a flashcards-tobias
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       - name: Verify Fly app status
-        run: flyctl status
+        run: flyctl status -a flashcards-tobias
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
