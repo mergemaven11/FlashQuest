@@ -1,739 +1,365 @@
-// frontend/src/pages/Admin.tsx
-/**
- * Admin view:
- * - Create new cards
- * - List cards with bin/status (joins user state on backend)
- * - Client-side search across word/definition
- * - Reset all progress (per default user)
- * - Export current cards to CSV (ALL rows or VISIBLE/filtered)
- * - Import cards from CSV (word,definition) — at the very bottom
- * - Delete a single card (trashcan icon on far-left)
- */
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  adminReset,
+  createCard,
+  deleteCard,
+  listAdminCards,
+  updateCard,
+} from "../api";
+import type { CardAdminRead, CardKind, CreateCardPayload } from "../types";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createCard, listAdminCards, adminReset, deleteCard } from "../api";
-import type { CardAdminRead, CreateCardPayload } from "../types";
-
-/** Row parsed from CSV. */
-type CsvRow = { word: string; definition: string };
-
-/**
- * Detect a likely CSV delimiter from the first line.
- * @param s Raw CSV text
- * @returns the detected delimiter character (default ",")
- */
-function detectDelimiter(s: string): string {
-  const firstLine = (s.split(/\r?\n/)[0] ?? "").replace(/^\uFEFF/, "");
-  const candidates = [",", ";", "\t", "|"];
-  let best = ",";
-  let bestCount = -1;
-  for (const d of candidates) {
-    const c = (firstLine.match(new RegExp(`\\${d}`, "g")) || []).length;
-    if (c > bestCount) {
-      bestCount = c;
-      best = d;
-    }
-  }
-  return best;
-}
-
-/**
- * Parse CSV text into a grid of cells.
- * Handles quoted fields, escaped quotes, commas in quotes, mixed newlines, BOM.
- * @param text CSV content as a string
- * @param delimiter Optional forced delimiter; auto-detected when omitted
- */
-function parseCSV(text: string, delimiter?: string): string[][] {
-  const rows: string[][] = [];
-  let cur = "";
-  let row: string[] = [];
-  let inQuotes = false;
-  let i = 0;
-
-  const s0 = text.replace(/^\uFEFF/, "");
-  const d = delimiter ?? detectDelimiter(s0);
-  const s = s0.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-
-  while (i < s.length) {
-    const ch = s[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (s[i + 1] === '"') {
-          cur += '"';
-          i += 2;
-          continue;
-        } else {
-          inQuotes = false;
-          i += 1;
-          continue;
-        }
-      } else {
-        cur += ch;
-        i += 1;
-        continue;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-        i += 1;
-        continue;
-      }
-      if (ch === d) {
-        row.push(cur);
-        cur = "";
-        i += 1;
-        continue;
-      }
-      if (ch === "\n") {
-        row.push(cur);
-        rows.push(row);
-        row = [];
-        cur = "";
-        i += 1;
-        continue;
-      }
-      cur += ch;
-      i += 1;
-    }
-  }
-  row.push(cur);
-  rows.push(row);
-  return rows.filter((r) => !(r.length === 1 && r[0] === ""));
-}
-
-/**
- * Convert a cell grid into CsvRow objects.
- * Detects header (word/definition), falls back to first two columns.
- */
-function gridToRows(grid: string[][]): CsvRow[] {
-  if (grid.length === 0) return [];
-  const header = grid[0].map((h) => h.trim().toLowerCase());
-  const hasHeader =
-    header.includes("word") && header.includes("definition") && grid.length > 1;
-
-  const rows = hasHeader ? grid.slice(1) : grid;
-  let wordIdx = 0;
-  let defIdx = 1;
-
-  if (hasHeader) {
-    wordIdx = header.indexOf("word");
-    defIdx = header.indexOf("definition");
-  }
-
-  const out: CsvRow[] = [];
-  for (const r of rows) {
-    const word = (r[wordIdx] ?? "").trim();
-    const definition = (r[defIdx] ?? "").trim();
-    if (word && definition) out.push({ word, definition });
-  }
-  return out;
-}
-
-/**
- * Concurrency-limited async mapper.
- * @template T Input item type
- * @template R Result type
- * @param items Items to process
- * @param limit Max concurrency
- * @param worker Async worker function
- */
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  worker: (item: T, index: number) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  let active = 0;
-
-  return new Promise((resolve, reject) => {
-    const launch = () => {
-      while (active < limit && next < items.length) {
-        const i = next++;
-        active++;
-        worker(items[i], i)
-          .then((res) => (results[i] = res))
-          .catch(reject)
-          .finally(() => {
-            active--;
-            if (next === items.length && active === 0) resolve(results);
-            else launch();
-          });
-      }
-    };
-    launch();
-  });
-}
-
-/**
- * Escape a value for safe CSV serialization.
- * @param v Any value
- */
-function csvEscape(v: unknown): string {
-  const s = v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-/** Simple timestamp for filenames (YYYY-MM-DD-HH-MM-SS). */
-function stamp(): string {
-  return new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
-}
-
-/**
- * Download arbitrary rows as CSV with given columns.
- * Includes UTF-8 BOM for Excel.
- * @param filenameBase Base filename without extension
- * @param rows Array of row objects
- * @param columns Column keys to export (order respected)
- */
-function downloadCsv(
-  filenameBase: string,
-  rows: Array<Record<string, unknown>>,
-  columns: string[]
-) {
-  const header = columns.map(csvEscape).join(",");
-  const body = rows
-    .map((r) => columns.map((c) => csvEscape(r[c])).join(","))
-    .join("\r\n");
-  const csv = `\uFEFF${header}\r\n${body}\r\n`;
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${filenameBase}_${rows.length}_${stamp()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export default function Admin() {
-  // ===== Basic state =====
+  const [cards, setCards] = useState<CardAdminRead[]>([]);
   const [q, setQ] = useState("");
-  const [list, setList] = useState<CardAdminRead[]>([]);
-  const [word, setWord] = useState("");
-  const [definition, setDefinition] = useState("");
+  const [topicFilter, setTopicFilter] = useState("all");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [demoPassword, setDemoPassword] = useState("");
 
-  // Track which rows are being deleted (per-row disabled/spinner)
-  const [deleting, setDeleting] = useState<Set<number>>(new Set());
+  const [word, setWord] = useState("");
+  const [definition, setDefinition] = useState("");
+  const [topic, setTopic] = useState("My Topic");
+  const [domain, setDomain] = useState("General");
+  const [kind, setKind] = useState<CardKind>("concept");
 
-  // ===== CSV state (import section lives at the bottom) =====
-  const [csvName, setCsvName] = useState<string | null>(null);
-  const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
-  const [csvError, setCsvError] = useState<string | null>(null);
-  const [importing, setImporting] = useState(0); // 0 or progress percent
-  const [importProgress, setImportProgress] = useState(0);
-  const [importSummary, setImportSummary] = useState<{
-    created: number;
-    skipped: number;
-    failed: number;
-  } | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editWord, setEditWord] = useState("");
+  const [editDefinition, setEditDefinition] = useState("");
+  const [editTopic, setEditTopic] = useState("");
+  const [editDomain, setEditDomain] = useState("");
+  const [editKind, setEditKind] = useState<CardKind>("concept");
+  const createRef = useRef<HTMLDivElement | null>(null);
 
-  // ===== Dropdown menu state for the Import/Export menu =====
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
-
-  /** Fetch the full list (no server-side filtering). */
-  async function refreshAll() {
-    setErr(null);
+  async function refresh() {
     setLoading(true);
+    setErr(null);
     try {
-      const rows = await listAdminCards();
-      setList(rows);
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to load cards");
+      setCards(await listAdminCards());
+    } catch (error) {
+      setErr(errorMessage(error, "Could not load cards"));
     } finally {
       setLoading(false);
     }
   }
 
-  // Client-side filtering so imports/exports/resets see everything by default
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return list;
-    return list.filter(
-      (c) =>
-        c.word.toLowerCase().includes(s) ||
-        c.definition.toLowerCase().includes(s)
-    );
-  }, [q, list]);
-
-  // Initial load
   useEffect(() => {
-    void refreshAll();
+    void refresh();
   }, []);
 
-  /** Create a card, then refresh full list. */
-  async function onCreate(e: React.FormEvent) {
-    e.preventDefault();
+  const topics = useMemo(
+    () => Array.from(new Set(cards.map((card) => card.topic))).sort(),
+    [cards]
+  );
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return cards.filter((card) => {
+      if (topicFilter !== "all" && card.topic !== topicFilter) return false;
+      if (!query) return true;
+      return [card.word, card.definition, card.topic, card.domain, card.kind]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [cards, q, topicFilter]);
+
+  const builtInCount = cards.filter((card) => card.is_builtin).length;
+  const customCount = cards.length - builtInCount;
+
+  async function onCreate(event: FormEvent) {
+    event.preventDefault();
     if (!word.trim() || !definition.trim()) return;
-    setErr(null);
     setLoading(true);
+    setErr(null);
+    setNotice(null);
     try {
-      await createCard({ word: word.trim(), definition: definition.trim() });
+      const payload: CreateCardPayload = {
+        word: word.trim(),
+        definition: definition.trim(),
+        topic: topic.trim() || "My Topic",
+        domain: domain.trim() || "General",
+        kind,
+      };
+      await createCard(payload);
       setWord("");
       setDefinition("");
-      setQ(""); // show new item even if user had a filter
-      await refreshAll();
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to create card");
+      setNotice("Card added. It is ready to study in Play.");
+      await refresh();
+    } catch (error) {
+      setErr(errorMessage(error, "Could not create card"));
     } finally {
       setLoading(false);
     }
   }
 
-  /** Confirm + reset progress; then hard refresh. */
-  async function onResetProgress() {
-    if (!confirm("Reset ALL progress for the default user? This cannot be undone.")) return;
+  function startEdit(card: CardAdminRead) {
+    if (card.is_builtin) return;
+    setEditingId(card.id);
+    setEditWord(card.word);
+    setEditDefinition(card.definition);
+    setEditTopic(card.topic);
+    setEditDomain(card.domain);
+    setEditKind(card.kind === "lab" ? "lab" : "concept");
+    setErr(null);
+  }
+
+  async function saveEdit(cardId: number) {
+    setLoading(true);
+    setErr(null);
+    setNotice(null);
+    try {
+      await updateCard(cardId, {
+        word: editWord.trim(),
+        definition: editDefinition.trim(),
+        topic: editTopic.trim() || "My Topic",
+        domain: editDomain.trim() || "General",
+        kind: editKind,
+      });
+      setEditingId(null);
+      setNotice("Custom card updated.");
+      await refresh();
+    } catch (error) {
+      setErr(errorMessage(error, "Could not update card"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function copyToCustom(card: CardAdminRead) {
+    setWord(card.word.replace(/^LAB ·\s*/, ""));
+    setDefinition(card.definition);
+    setTopic(`My ${card.topic}`);
+    setDomain(card.domain.replace(/ Labs$/, ""));
+    setKind(card.kind === "lab" ? "lab" : "concept");
+    setNotice("Copied into the new-card form. Change anything you want, then save it.");
+    requestAnimationFrame(() => createRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  async function onDelete(card: CardAdminRead) {
+    if (card.is_builtin && !demoPassword) {
+      setErr("Built-in demo cards are protected. Enter the demo admin password first.");
+      return;
+    }
+    const warning = card.is_builtin
+      ? "Delete this protected built-in demo card? The admin password will be checked."
+      : "Delete this custom card and its study progress?";
+    if (!window.confirm(warning)) return;
+
     setLoading(true);
     setErr(null);
     try {
-      await adminReset();
-      setQ("");
-      await refreshAll();
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to reset progress");
+      await deleteCard(card.id, card.is_builtin ? demoPassword : undefined);
+      setNotice(card.is_builtin ? "Built-in card deleted." : "Custom card deleted.");
+      await refresh();
+    } catch (error) {
+      setErr(errorMessage(error, "Could not delete card"));
     } finally {
       setLoading(false);
     }
   }
 
-  /** Delete a card (red trashcan on far-left). */
-  async function onDelete(id: number) {
-    if (!confirm("Delete this card? This removes the card and its progress.")) return;
-    setDeleting((s) => new Set(s).add(id));
+  async function onResetProgress() {
+    if (!demoPassword) {
+      setErr("Enter the demo admin password before resetting shared demo progress.");
+      return;
+    }
+    if (!window.confirm("Reset progress for every card in the shared demo?")) return;
+    setLoading(true);
+    setErr(null);
     try {
-      // Optimistic removal
-      setList((prev) => prev.filter((c) => c.id !== id));
-      await deleteCard(id);
-      // If you prefer authoritative list, call: await refreshAll();
-    } catch (e: any) {
-      // Revert by reloading the list on failure
-      await refreshAll();
-      setErr(e?.message ?? "Failed to delete card");
+      await adminReset(demoPassword);
+      setNotice("Shared demo progress reset to level 0.");
+      await refresh();
+    } catch (error) {
+      setErr(errorMessage(error, "Could not reset progress"));
     } finally {
-      setDeleting((s) => {
-        const next = new Set(s);
-        next.delete(id);
-        return next;
-      });
+      setLoading(false);
     }
-  }
-
-  // ===== CSV import helpers (bottom section UI) =====
-
-  /** Handle file selection and parse into CsvRow[] */
-  async function onPickCsv(file: File) {
-    try {
-      setCsvError(null);
-      setCsvName(file.name);
-      const text = await file.text();
-      const grid = parseCSV(text); // auto-detects delimiter + handles BOM
-      let rows = gridToRows(grid);
-
-      // Dedup within-file by word (case-insensitive)
-      const seen = new Set<string>();
-      rows = rows.filter((r) => {
-        const k = r.word.toLowerCase();
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
-
-      setCsvRows(rows);
-      setImportSummary(null);
-      setImportProgress(0);
-    } catch (e) {
-      setCsvError(e instanceof Error ? e.message : "Failed to parse CSV");
-      setCsvRows([]);
-      setCsvName(null);
-    }
-  }
-
-  /** Begin importing parsed CSV rows using limited concurrency. */
-  async function startImport() {
-    if (csvRows.length === 0) return;
-    setImporting(1);
-    setImportSummary(null);
-    setImportProgress(0);
-
-    let created = 0;
-    let failed = 0;
-    const TOTAL = csvRows.length;
-    let done = 0;
-
-    try {
-      await mapWithConcurrency<CreateCardPayload, void>(
-        csvRows.map((r) => ({ word: r.word, definition: r.definition })),
-        5,
-        async (payload) => {
-          try {
-            await createCard(payload);
-            created += 1;
-          } catch {
-            failed += 1;
-          } finally {
-            done += 1;
-            setImportProgress(Math.round((done / TOTAL) * 100));
-          }
-        }
-      );
-      const skipped = 0;
-      setImportSummary({ created, failed, skipped });
-      setQ("");
-      await refreshAll();
-    } finally {
-      setImporting(0);
-    }
-  }
-
-  // ===== Export helpers =====
-  function exportWordsDefsAll() {
-    const rows = list.map((c) => ({ word: c.word, definition: c.definition }));
-    downloadCsv("flashcards_export_words_defs_ALL", rows, ["word", "definition"]);
-  }
-  function exportWordsDefsVisible() {
-    const rows = filtered.map((c) => ({ word: c.word, definition: c.definition }));
-    downloadCsv("flashcards_export_words_defs_VISIBLE", rows, ["word", "definition"]);
-  }
-  function exportFullAll() {
-    const rows = list.map((c) => ({
-      id: c.id,
-      word: c.word,
-      definition: c.definition,
-      bin: c.bin,
-      status: c.status,
-      created_at: c.created_at ?? "",
-    }));
-    downloadCsv(
-      "flashcards_export_full_ALL",
-      rows,
-      ["id", "word", "definition", "bin", "status", "created_at"]
-    );
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6">
-      {/* Title */}
-      <div className="flex items-end justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Admin</h1>
-      </div>
-
-      {err && <div className="border border-red-300 bg-red-50 p-2">{err}</div>}
-
-      {/* Explainer card: what columns mean */}
-      <div className="rounded-2xl border border-black/10 bg-white p-4">
-        <h2 className="text-lg font-semibold text-black">What the columns mean</h2>
-        <dl className="mt-3 grid grid-cols-1 gap-3 text-sm text-neutral-800 sm:grid-cols-2">
-          <div>
-            <dt className="font-medium text-black">ID</dt>
-            <dd>Internal numeric identifier for the card.</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-black">Word</dt>
-            <dd>The vocabulary term you’re learning.</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-black">Definition</dt>
-            <dd>Short explanation of the word.</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-black">Bin</dt>
-            <dd>Spaced-repetition level (0–11). Higher bins appear less often.</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-black">Status</dt>
-            <dd>
-              <b>active</b> = in rotation; <b>hard_to_remember</b> = many wrong answers;{" "}
-              <b>never</b> = maxed out at bin 11.
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium text-black">Created</dt>
-            <dd>When the card was added.</dd>
-          </div>
-        </dl>
-      </div>
-
-      {/* Create form */}
-      <form onSubmit={onCreate} className="border rounded p-3 flex gap-2 items-end bg-white">
-        <div className="flex-1">
-          <label className="block text-sm mb-1">Word</label>
-          <input
-            className="w-full border rounded px-2 py-1"
-            value={word}
-            onChange={(e) => setWord(e.target.value)}
-            placeholder="abate"
-          />
+    <div className="mx-auto grid max-w-6xl gap-6">
+      <section className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#ffba08]">🧪 Deck Lab</p>
+          <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">Build your own study deck.</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+            Platform Engineering is the demo pack. Add any topic you want and FlashQuest’s will use the same memory engine for it.
+          </p>
         </div>
-        <div className="flex-[2]">
-          <label className="block text-sm mb-1">Definition</label>
-          <input
-            className="w-full border rounded px-2 py-1"
-            value={definition}
-            onChange={(e) => setDefinition(e.target.value)}
-            placeholder="to become less intense or widespread"
-          />
+        <div className="flex gap-2 text-xs font-bold">
+          <span className="game-chip px-3 py-2 text-slate-200">{cards.length} total</span>
+          <span className="game-chip px-3 py-2 text-[#ffba08]">{builtInCount} built-in</span>
+          <span className="game-chip px-3 py-2 text-[#faa307]">{customCount} custom</span>
         </div>
-        <button className="px-3 py-2 rounded bg-black text-white" type="submit" disabled={loading}>
-          Add
-        </button>
-      </form>
+      </section>
 
-      {/* Search + counts */}
-      <div className="flex items-end justify-between gap-2">
-        <div className="flex gap-2 flex-1">
+      <section className="game-panel p-5 sm:p-6">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-[#ffba08]">How Deck Lab works</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["➕", "Make a card", "Type a question and answer."],
+            ["🏷️", "Name the topic", "AWS, Spanish, math — anything."],
+            ["📚", "Pick a type", "Concept = learn it. Lab = fix it."],
+            ["⚡", "Go to Play", "Your new topic appears automatically."],
+          ].map(([icon, title, detail]) => (
+            <div key={title} className="rounded-2xl border border-white/10 bg-black/15 p-4">
+              <span className="text-2xl">{icon}</span>
+              <p className="mt-3 font-black text-white">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">{detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {err && <div className="rounded-2xl border border-[#d00000]/50 bg-[#6a040f]/55 p-4 text-sm font-semibold text-white">⚠️ {err}</div>}
+      {notice && <div className="rounded-2xl border border-[#faa307]/30 bg-[#faa307]/10 p-4 text-sm font-semibold text-[#ffba08]">✨ {notice}</div>}
+
+      <section ref={createRef} className="game-panel p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#ffba08]">Create a custom card</p>
+            <h2 className="mt-1 text-xl font-black text-white">What do you want to remember?</h2>
+          </div>
+          <span className="game-chip px-3 py-1.5 text-xs text-slate-400">Custom cards never need the demo password to delete.</span>
+        </div>
+        <form onSubmit={onCreate} className="mt-5 grid gap-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <label className="grid gap-2 text-sm font-bold text-slate-200">
+              Question
+              <textarea className="deck-input min-h-28" value={word} onChange={(e) => setWord(e.target.value)} placeholder="What is a Kubernetes readiness probe?" required />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-200">
+              Answer
+              <textarea className="deck-input min-h-28" value={definition} onChange={(e) => setDefinition(e.target.value)} placeholder="It tells the platform when a workload is ready to receive traffic..." required />
+            </label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-2 text-sm font-bold text-slate-200">
+              Topic
+              <input className="deck-input" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="My AWS Study" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-200">
+              Domain
+              <input className="deck-input" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="Networking" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-200">
+              Type
+              <select className="deck-input" value={kind} onChange={(e) => setKind(e.target.value as CardKind)}>
+                <option value="concept">📚 Concept</option>
+                <option value="lab">🔧 Break/Fix Lab</option>
+              </select>
+            </label>
+          </div>
+          <div>
+            <button className="game-button bg-gradient-to-r from-[#dc2f02] via-[#f48c06] to-[#ffba08] px-5 py-3 text-sm text-[#370617]" type="submit" disabled={loading}>
+              ➕ Add card to FlashQuest’s
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="game-panel p-5 sm:p-6">
+        <div className="grid gap-3 lg:grid-cols-[1fr_240px]">
+          <input className="deck-input" placeholder="Search question, answer, topic, domain…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <select className="deck-input" value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)}>
+            <option value="all">All topics</option>
+            {topics.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">Showing {filtered.length} of {cards.length} cards.</p>
+      </section>
+
+      <section className="grid gap-3">
+        {filtered.map((card) => {
+          const editing = editingId === card.id;
+          return (
+            <article key={card.id} className="game-panel p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="game-chip px-2.5 py-1 text-[11px] font-black text-[#ffba08]">{card.kind === "lab" ? "🔧 LAB" : "📚 CONCEPT"}</span>
+                    <span className="game-chip px-2.5 py-1 text-[11px] font-bold text-slate-300">{card.topic}</span>
+                    <span className="game-chip px-2.5 py-1 text-[11px] font-bold text-slate-400">{card.domain}</span>
+                    {card.is_builtin && <span className="game-chip px-2.5 py-1 text-[11px] font-black text-[#faa307]">🔒 BUILT-IN</span>}
+                    <span className="text-[11px] font-bold text-slate-600">Mastery {card.bin}/11 · {card.status}</span>
+                  </div>
+
+                  {editing ? (
+                    <div className="mt-4 grid gap-3">
+                      <textarea className="deck-input min-h-24" value={editWord} onChange={(e) => setEditWord(e.target.value)} />
+                      <textarea className="deck-input min-h-28" value={editDefinition} onChange={(e) => setEditDefinition(e.target.value)} />
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <input className="deck-input" value={editTopic} onChange={(e) => setEditTopic(e.target.value)} />
+                        <input className="deck-input" value={editDomain} onChange={(e) => setEditDomain(e.target.value)} />
+                        <select className="deck-input" value={editKind} onChange={(e) => setEditKind(e.target.value as CardKind)}>
+                          <option value="concept">Concept</option>
+                          <option value="lab">Lab</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="game-button bg-[#faa307] px-4 py-2 text-sm text-[#370617]" onClick={() => void saveEdit(card.id)}>Save</button>
+                        <button className="game-button border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-slate-200" onClick={() => setEditingId(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="mt-4 text-lg font-black leading-7 text-white">{card.word}</h2>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{card.definition}</p>
+                    </>
+                  )}
+                </div>
+
+                {!editing && (
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {card.is_builtin ? (
+                      <button className="game-button border border-[#faa307]/25 bg-[#faa307]/10 px-3 py-2 text-xs text-[#ffba08]" onClick={() => copyToCustom(card)}>
+                        ✨ Customize a copy
+                      </button>
+                    ) : (
+                      <button className="game-button border border-white/10 bg-white/[0.06] px-3 py-2 text-xs text-slate-200" onClick={() => startEdit(card)}>
+                        ✏️ Edit
+                      </button>
+                    )}
+                    <button className="game-button border border-[#d00000]/35 bg-[#6a040f]/45 px-3 py-2 text-xs text-[#ffba08]" onClick={() => void onDelete(card)} disabled={loading}>
+                      🗑️ Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+        {!loading && filtered.length === 0 && (
+          <div className="game-panel p-8 text-center text-slate-400">No cards match this view.</div>
+        )}
+      </section>
+
+      <section className="game-panel border-[#d00000]/25 p-5 sm:p-6">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-[#ffba08]">🔐 Demo admin controls</p>
+        <h2 className="mt-1 text-xl font-black text-white">Protect the built-in demo.</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+          Built-in Platform Engineering cards are read-only. The server-side password is required to delete one or reset the shared demo progress. The password is never saved in the browser.
+        </p>
+        <div className="mt-4 flex max-w-xl flex-col gap-2 sm:flex-row">
           <input
-            className="border rounded px-2 py-1 flex-1"
-            placeholder="Search (word/definition)…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+            className="deck-input flex-1"
+            type="password"
+            autoComplete="off"
+            value={demoPassword}
+            onChange={(e) => setDemoPassword(e.target.value)}
+            placeholder="Demo admin password"
           />
-          <button
-            className="px-3 py-2 rounded bg-gray-200"
-            onClick={() => setQ("")}
-            disabled={loading || q === ""}
-          >
-            Clear
+          <button className="game-button border border-[#d00000]/40 bg-[#9d0208]/55 px-4 py-2 text-sm text-white" onClick={() => void onResetProgress()} disabled={loading}>
+            Reset shared progress
           </button>
         </div>
-        <div className="text-sm text-neutral-700">
-          Showing <b>{filtered.length}</b> of <b>{list.length}</b>
-        </div>
-      </div>
-
-      {loading && <div className="opacity-70">Loading…</div>}
-
-      {/* Results table */}
-      <div className="overflow-auto border rounded">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="p-2 w-[36px]" title="Delete" aria-label="Delete column">{/* Trash */}</th>
-              <th className="p-2">ID</th>
-              <th className="p-2">Word</th>
-              <th className="p-2">Definition</th>
-              <th className="p-2">Bin</th>
-              <th className="p-2">Status</th>
-              <th className="p-2">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((c) => {
-              const isDeleting = deleting.has(c.id);
-              return (
-                <tr key={c.id} className="border-t align-top">
-                  {/* Red trashcan on far-left */}
-                  <td className="p-2">
-                    <button
-                      className="rounded p-1 hover:bg-red-50 transition disabled:opacity-50"
-                      title="Delete card"
-                      aria-label={`Delete ${c.word}`}
-                      onClick={() => void onDelete(c.id)}
-                      disabled={isDeleting}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        className={`h-4 w-4 ${isDeleting ? "text-red-400" : "text-red-600 hover:text-red-700"}`}
-                      >
-                        <path d="M9 3a1 1 0 0 0-1 1v1H5.5a1 1 0 1 0 0 2H6v11a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7h.5a1 1 0 1 0 0-2H16V4a1 1 0 0 0-1-1H9zm2 2h2v1h-2V5zM8 7h8v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V7zm2.75 3a.75.75 0 0 0-.75.75v6.5a.75.75 0 1 0 1.5 0v-6.5a.75.75 0 0 0-.75-.75zm4.5 0a.75.75 0 0 0-.75.75v6.5a.75.75 0 1 0 1.5 0v-6.5a.75.75 0 0 0-.75-.75z" />
-                      </svg>
-                    </button>
-                  </td>
-
-                  <td className="p-2">{c.id}</td>
-                  <td className="p-2 font-medium text-black">{c.word}</td>
-                  <td className="p-2 whitespace-pre-wrap break-words text-neutral-900">{c.definition}</td>
-                  <td className="p-2">{c.bin}</td>
-                  <td className="p-2">{c.status}</td>
-                  <td className="p-2">
-                    {c.created_at ? new Date(c.created_at).toLocaleString() : "—"}
-                  </td>
-                </tr>
-              );
-            })}
-            {!loading && filtered.length === 0 && (
-              <tr>
-                <td className="p-2 text-gray-500" colSpan={7}>
-                  No cards yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* === CSV Import (last section) === */}
-      <div className="rounded-2xl border border-black/10 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-black">Import from CSV</h2>
-
-          <div className="flex gap-2 items-center">
-            {/* Dropdown menu with exports + reset */}
-            <div className="relative" ref={menuRef}>
-              <button
-                type="button"
-                onClick={() => setMenuOpen((v) => !v)}
-                className="rounded-lg border border-black/10 px-3 py-1 text-sm text-neutral-800 hover:bg-neutral-50 transition"
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-              >
-                Download template
-                <span className="ml-1 align-middle">▾</span>
-              </button>
-
-              {menuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 z-10 mt-1 w-64 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg"
-                >
-                  <button
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      exportWordsDefsAll();
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50"
-                  >
-                    Export words+defs (ALL {list.length})
-                  </button>
-                  <button
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      exportWordsDefsVisible();
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 disabled:opacity-50"
-                    disabled={filtered.length === 0}
-                  >
-                    Export words+defs (VISIBLE {filtered.length})
-                  </button>
-                  <button
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      exportFullAll();
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 disabled:opacity-50"
-                    disabled={list.length === 0}
-                  >
-                    Export full (ALL {list.length})
-                  </button>
-
-                  <div className="my-1 h-px bg-neutral-200" />
-
-                  <button
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onResetProgress();
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                  >
-                    Reset all progress
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Choose file */}
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="rounded-lg border border-black px-3 py-1 text-sm text-black hover:bg-black hover:text-white transition"
-            >
-              Choose file
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onPickCsv(f);
-              }}
-            />
-          </div>
-        </div>
-
-        <p className="mt-2 text-sm text-neutral-700">
-          CSV should contain <code>word</code> and <code>definition</code> columns (header
-          optional). Quotes, commas, and UTF-8 BOM are supported.
-        </p>
-
-        {csvError && <p className="mt-2 text-sm text-red-700">Error: {csvError}</p>}
-
-        {csvRows.length > 0 && (
-          <div className="mt-3 space-y-3">
-            <div className="text-sm text-neutral-800">
-              File: <b>{csvName}</b> — Parsed rows: <b>{csvRows.length}</b>
-            </div>
-
-            <div className="overflow-auto border rounded">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="p-2">Word</th>
-                    <th className="p-2">Definition</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {csvRows.map((r, i) => (
-                    <tr key={i} className="border-t align-top">
-                      <td className="p-2 font-medium text-black">{r.word}</td>
-                      <td className="p-2 whitespace-pre-wrap break-words text-neutral-900">
-                        {r.definition}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={startImport}
-                disabled={!!importing}
-                className="rounded-xl border border-black bg-black px-4 py-2 text-white hover:bg-white hover:text-black transition"
-              >
-                {importing ? "Importing…" : "Import"}
-              </button>
-              {!!importing && (
-                <div className="flex items-center gap-2 text-sm text-neutral-700">
-                  <div className="h-2 w-40 overflow-hidden rounded bg-neutral-200">
-                    <div
-                      className="h-2 bg-black transition-all"
-                      style={{ width: `${importProgress}%` }}
-                    />
-                  </div>
-                  <span>{importProgress}%</span>
-                </div>
-              )}
-              {importSummary && (
-                <div className="text-sm text-neutral-800">
-                  Created: <b>{importSummary.created}</b>, Failed:{" "}
-                  <b>{importSummary.failed}</b>, Skipped: <b>{importSummary.skipped}</b>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      </section>
     </div>
   );
 }
