@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
+import { ExperienceProvider } from "./experience";
 import { GameFeelProvider, SoundToggle } from "./gameFeel";
 import Admin from "./pages/Admin";
 import Landing from "./pages/Landing";
@@ -7,6 +8,7 @@ import Library from "./pages/Library";
 import LibraryDeck from "./pages/LibraryDeck";
 import Login from "./pages/Login";
 import MyDecks from "./pages/MyDecks";
+import Preferences from "./pages/Preferences";
 import Signup from "./pages/Signup";
 import Status from "./pages/Status";
 import Study from "./pages/Study";
@@ -48,6 +50,14 @@ function Shell() {
               ))}
             </nav>
             <SoundToggle />
+            <NavLink
+              to="/preferences"
+              aria-label="Experience settings"
+              title="Experience settings"
+              className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
+            >
+              <span aria-hidden="true">🎚️</span><span className="hidden xl:inline">Experience</span>
+            </NavLink>
             <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button flex items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08]">📖 Docs</a>
             {user ? (
               <div className="flex items-center gap-2">
@@ -71,6 +81,7 @@ function Shell() {
           <Route path="/admin" element={<Navigate to="/deck-lab" replace />} />
           <Route path="/decks" element={<MyDecks />} />
           <Route path="/status" element={<Status />} />
+          <Route path="/preferences" element={<Preferences />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
@@ -79,7 +90,7 @@ function Shell() {
       </main>
 
       <footer className="relative z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500">
-        <span>Library · community decks · Platform Engineering · 12 mastery levels</span>
+        <span>Library · community decks · Arcade foundation · adaptable learning modes</span>
         <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">FastAPI · React · PostgreSQL · Docker · Docs ↗</a>
       </footer>
     </div>
@@ -88,12 +99,14 @@ function Shell() {
 
 export default function App() {
   return (
-    <GameFeelProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <Shell />
-        </AuthProvider>
-      </BrowserRouter>
-    </GameFeelProvider>
+    <ExperienceProvider>
+      <GameFeelProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Shell />
+          </AuthProvider>
+        </BrowserRouter>
+      </GameFeelProvider>
+    </ExperienceProvider>
   );
 }
