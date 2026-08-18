@@ -8,7 +8,7 @@
 
 Start instantly with the featured **216-card Platform Engineering deck**. Then create a verified account and build private decks for **anything you want to learn**.
 
-[Open FlashQuest’s →](https://flashcards-tobias.netlify.app/){ .md-button .md-button--primary }
+[Open FlashQuest’s →](https://flaskquest.netlify.app/){ .md-button .md-button--primary }
 [Make your own deck →](MAKE_YOUR_OWN_DECK.md){ .md-button }
 
 </div>
