@@ -83,9 +83,7 @@ def test_law_curriculum_carries_scope_and_advice_boundary():
 
     domains = load_deck(law.sources[0].path)
     prompts_and_answers = " ".join(
-        f"{prompt} {answer}"
-        for cards in domains.values()
-        for prompt, answer in cards
+        f"{prompt} {answer}" for cards in domains.values() for prompt, answer in cards
     ).lower()
     assert "not legal advice" in prompts_and_answers
     assert "jurisdiction" in prompts_and_answers
@@ -189,9 +187,15 @@ def test_seed_scopes_prompt_identity_to_each_deck(sqlite_session):
     seed_all_curricula(sqlite_session)
 
     first_deck = sqlite_session.exec(select(Deck).where(Deck.slug == first.slug)).one()
-    second_deck = sqlite_session.exec(select(Deck).where(Deck.slug == second.slug)).one()
-    first_card = sqlite_session.exec(select(Card).where(Card.deck_id == first_deck.id)).first()
-    second_card = sqlite_session.exec(select(Card).where(Card.deck_id == second_deck.id)).first()
+    second_deck = sqlite_session.exec(
+        select(Deck).where(Deck.slug == second.slug)
+    ).one()
+    first_card = sqlite_session.exec(
+        select(Card).where(Card.deck_id == first_deck.id)
+    ).first()
+    second_card = sqlite_session.exec(
+        select(Card).where(Card.deck_id == second_deck.id)
+    ).first()
 
     assert first_card is not None and second_card is not None
     original_first_deck_id = first_card.deck_id
