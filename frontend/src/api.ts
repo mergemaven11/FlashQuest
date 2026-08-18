@@ -245,7 +245,30 @@ export async function createDeck(title: string, description = ""): Promise<DeckR
   }
 }
 
-export async function copyFeaturedDeck(deckId: number): Promise<DeckRead> {
+export async function publishDeck(
+  deckId: number,
+  visibility: "public" | "unlisted" = "public"
+): Promise<DeckRead> {
+  try {
+    const { data } = await api.post<DeckRead>(`/decks/${deckId}/publish`, null, {
+      params: { visibility },
+    });
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function unpublishDeck(deckId: number): Promise<DeckRead> {
+  try {
+    const { data } = await api.post<DeckRead>(`/decks/${deckId}/unpublish`);
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function copyDeck(deckId: number): Promise<DeckRead> {
   try {
     const { data } = await api.post<DeckRead>(`/decks/${deckId}/copy`);
     return data;
@@ -253,6 +276,8 @@ export async function copyFeaturedDeck(deckId: number): Promise<DeckRead> {
     throw normalizeError(e);
   }
 }
+
+export const copyFeaturedDeck = copyDeck;
 
 export async function deleteDeck(deckId: number): Promise<void> {
   try {

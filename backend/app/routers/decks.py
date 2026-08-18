@@ -30,6 +30,7 @@ VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced", "expert"}
 VALID_LIBRARY_SOURCES = {"all", "official", "community"}
 VALID_LIBRARY_SORTS = {"featured", "newest", "updated", "title"}
 VALID_LIBRARY_KINDS = {"concept", "lab"}
+VALID_PUBLISH_VISIBILITIES = {"public", "unlisted"}
 
 
 def _slugify(value: str) -> str:
@@ -320,18 +321,68 @@ def update_deck(
     return _read(session, deck)
 
 
-@router.post("/{deck_id}/copy", response_model=DeckRead, status_code=201)
-def copy_featured_deck(
+@router.post("/{deck_id}/publish", response_model=DeckRead)
+def publish_deck(
+    deck_id: int,
+    visibility: str = Query("public", pattern="^(public|unlisted)$"),
+    user: User = Depends(require_verified_user),
+    session: Session = Depends(get_session),
+) -> DeckRead:
+    """Explicitly publish an owned deck publicly or by unlisted share link."""
+    deck = _owned_deck(session, deck_id, int(user.id or 0))
+    normalized_visibility = visibility.strip().lower()
+    if normalized_visibility not in VALID_PUBLISH_VISIBILITIES:
+        raise HTTPException(status_code=422, detail="Visibility must be public or unlisted")
+    if _card_count(session, deck_id) < 1:
+        raise HTTPException(status_code=422, detail="Add at least one card before publishing")
+
+    now = utc_now()
+    deck.visibility = normalized_visibility
+    if deck.published_at is None:
+        deck.published_at = now
+    deck.updated_at = now
+    session.add(deck)
+    session.commit()
+    session.refresh(deck)
+    return _read(session, deck)
+
+
+@router.post("/{deck_id}/unpublish", response_model=DeckRead)
+def unpublish_deck(
     deck_id: int,
     user: User = Depends(require_verified_user),
     session: Session = Depends(get_session),
 ) -> DeckRead:
-    """Copy an Official deck into a private user-owned remix."""
-    source = session.get(Deck, deck_id)
-    if source is None or not source.is_builtin:
-        raise HTTPException(status_code=404, detail="Featured deck not found")
+    """Remove an owned deck from all public/share-link access."""
+    deck = _owned_deck(session, deck_id, int(user.id or 0))
+    deck.visibility = "private"
+    deck.updated_at = utc_now()
+    session.add(deck)
+    session.commit()
+    session.refresh(deck)
+    return _read(session, deck)
 
-    title = f"{source.title} — My Copy"
+
+@router.post("/{deck_id}/copy", response_model=DeckRead, status_code=201)
+def copy_deck(
+    deck_id: int,
+    user: User = Depends(require_verified_user),
+    session: Session = Depends(get_session),
+) -> DeckRead:
+    """Copy an accessible deck into a private user-owned remix."""
+    source = session.get(Deck, deck_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    source_is_accessible = (
+        source.is_builtin
+        or source.visibility in {"public", "unlisted"}
+        or source.owner_id == user.id
+    )
+    if not source_is_accessible:
+        # Do not reveal private decks belonging to another creator.
+        raise HTTPException(status_code=404, detail="Deck not found")
+
+    title = f"{source.title} — Remix"
     target = Deck(
         owner_id=user.id,
         title=title,
