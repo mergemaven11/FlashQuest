@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     # Accept JSON-looking or comma-separated text; main.py normalizes it.
     ALLOWED_ORIGINS: str = ""
+    # Server-side only. Built-in demo cards cannot be deleted when this is blank.
+    DEMO_DELETE_PASSWORD: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
