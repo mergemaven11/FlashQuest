@@ -4,63 +4,145 @@
 
 ## Learn it. Break it. Fix it. Remember it.
 
-**FlashQuest’s** is a game-like Platform Engineering study and troubleshooting environment built with React, FastAPI, PostgreSQL, Alembic, Docker, and GitHub Actions.
+**FlashQuest’s** is a reusable, game-like study engine built with React, FastAPI, PostgreSQL, Alembic, and Docker.
 
-It combines a **216-card curriculum** with hands-on break/fix scenarios and a real full-stack application you can inspect while you study.
+Start instantly with the featured **216-card Platform Engineering deck**. Then create a verified account and build private decks for **anything you want to learn**.
+
+[Open FlashQuest’s →](https://flashcards-tobias.netlify.app/){ .md-button .md-button--primary }
+[Make your own deck →](MAKE_YOUR_OWN_DECK.md){ .md-button }
 
 </div>
 
 <div class="fq-grid" markdown>
 
 <div class="fq-card" markdown>
-**144 concept cards**
+**Try before signing up**
 
-Interview-style questions covering the systems Platform Engineers work with.
+The featured Platform Engineering deck is public, so visitors can understand the study loop immediately.
 </div>
 
 <div class="fq-card" markdown>
-**72 break/fix labs**
+**Verify once, build anything**
 
-Operational scenarios: diagnose the symptoms, choose the next signal, and recover safely.
+Sign up, verify your email, then create private decks with concept cards and break/fix labs.
 </div>
 
 <div class="fq-card" markdown>
-**12 domains**
+**216-card starter pack**
 
-Linux through incident response, with 18 challenges in every domain.
+144 Platform Engineering concepts + 72 practical troubleshooting labs across 12 domains.
 </div>
 
 <div class="fq-card" markdown>
 **12 mastery levels**
 
-PostgreSQL-backed spaced repetition tracks durable progress while session XP keeps studying fun.
+Spaced repetition stores durable progress in PostgreSQL while XP and streaks make each session feel like a game.
 </div>
 
 </div>
 
-## 🧭 Pick your path
+## 🧭 How the product works
 
-=== "Study"
+```text
+Visitor
+  │
+  ├── Play featured Platform Engineering deck
+  │
+  └── Sign up
+       │
+       ▼
+Verify email
+       │
+       ▼
+Sign in
+       │
+       ├── Create private deck
+       ├── Copy + customize featured deck
+       ├── Add concept / lab cards
+       └── Study with personal progress
+```
 
-    Start with the [Platform Engineering curriculum](CURRICULUM.md), then use the [Break/Fix Labs](LABS.md) to practice applying the concepts under pressure.
+### The UI explains the loop in five tiny steps
 
-=== "Build"
+1. **Pick a deck.**
+2. **Read the question and think first.**
+3. **Reveal the answer.**
+4. **Choose Missed it or Got it.**
+5. **Keep going — weaker cards return sooner.**
 
-    Read the [Platform Engineering architecture](PLATFORM_ENGINEERING.md) to see how FlashQuest’s handles health checks, migrations, configuration, containers, and CI quality gates.
-
-=== "Operate"
-
-    Use the [Operations & Deployment guide](OPERATIONS.md) for startup order, diagnostics, database lifecycle, Docker commands, and deployment boundaries.
-
-=== "Inspect the code"
-
-    Jump into the generated [Backend API](backend/api.md) or [Frontend reference](frontend/modules.md).
+For a **lab** card, pretend the system is broken, say what you would inspect first, then reveal the suggested recovery path.
 
 ---
 
-## ⚡ Quick start
+## ✨ Make your own deck
 
-A fresh environment should come up in this order:
+Platform Engineering is the first built-in pack, not the limit of the product.
+
+A verified user can create decks for topics such as:
+
+- AWS, Azure, Linux, Kubernetes, Security+, or Terraform;
+- Python, SQL, coding interviews, and database engineering;
+- school subjects;
+- language learning;
+- certifications;
+- personal study notes.
+
+Each card belongs to a **Deck** and carries a category/domain plus a type:
+
+```text
+User
+  └── Deck
+       └── Card
+            ├── domain / category
+            └── kind: concept | lab
+```
+
+The same study engine works for every deck.
+
+[See the custom-deck flow →](MAKE_YOUR_OWN_DECK.md){ .md-button .md-button--primary }
+[Read the account security model →](AUTHENTICATION.md){ .md-button }
+
+---
+
+## ⭐ Featured Platform Engineering deck
+
+The starter deck includes **216 challenges**:
+
+| Content | Count |
+| --- | ---: |
+| Concept / interview cards | 144 |
+| Break/Fix labs | 72 |
+| Domains | 12 |
+| **Total cards** | **216** |
+
+The built-in content covers Linux, networking, containers, Kubernetes, CI/CD, cloud, Terraform/IaC, observability, databases, security, SRE/reliability, and incident response.
+
+[Explore the curriculum →](CURRICULUM.md){ .md-button }
+[See the lab format →](LABS.md){ .md-button }
+
+---
+
+## 🔐 Accounts and email verification
+
+Custom deck creation is unlocked after email verification.
+
+FlashQuest’s uses:
+
+- salted PBKDF2-HMAC-SHA256 password hashes;
+- high-entropy opaque bearer sessions stored only as hashes;
+- one-time, expiring email-verification tokens stored only as hashes;
+- owner-scoped deck/card APIs;
+- server-side password protection for destructive maintenance on the public demo deck.
+
+Hosted verification emails are designed to use **Resend**. Local development can print verification URLs to the API log instead.
+
+[Accounts & email verification →](AUTHENTICATION.md){ .md-button .md-button--primary }
+
+---
+
+## ⚡ Local quick start
+
+A fresh environment comes up in this order:
 
 **start → migrate → seed → verify**
 
@@ -83,47 +165,14 @@ curl http://localhost:8080/health/live
 curl http://localhost:8080/health/ready
 ```
 
-Then open:
+Open:
 
-- **FlashQuest’s game UI:** `http://localhost:5173`
+- **React app:** `http://localhost:5173`
 - **FastAPI / OpenAPI:** `http://localhost:8080/docs`
-- **Readiness endpoint:** `http://localhost:8080/health/ready`
+- **Readiness:** `http://localhost:8080/health/ready`
 
-!!! tip "Seeding is safe to repeat"
-    The built-in curriculum seeder is idempotent. Existing prompts are reused, new curriculum cards are inserted, and missing default-user progress rows are repaired without duplicating the deck.
-
----
-
-## 📚 What you study
-
-Every domain contains **12 concept cards + 6 practical lab scenarios**.
-
-| Domain | Concepts | Labs | Total |
-| --- | ---: | ---: | ---: |
-| Linux & OS | 12 | 6 | 18 |
-| Networking | 12 | 6 | 18 |
-| Containers | 12 | 6 | 18 |
-| Kubernetes | 12 | 6 | 18 |
-| CI/CD | 12 | 6 | 18 |
-| Cloud | 12 | 6 | 18 |
-| IaC & Terraform | 12 | 6 | 18 |
-| Observability | 12 | 6 | 18 |
-| Databases | 12 | 6 | 18 |
-| Security | 12 | 6 | 18 |
-| SRE & Reliability | 12 | 6 | 18 |
-| Incident Response | 12 | 6 | 18 |
-| **Total** | **144** | **72** | **216** |
-
-The curriculum itself is versioned under:
-
-```text
-backend/app/data/
-├── platform_engineering_cards.json
-└── platform_engineering_labs.json
-```
-
-[Explore the full curriculum →](CURRICULUM.md){ .md-button .md-button--primary }
-[Try the lab format →](LABS.md){ .md-button }
+!!! tip "The featured seed is idempotent"
+    Re-running the seeder repairs the built-in Platform Engineering deck, its 216 cards, metadata, and missing anonymous-demo progress without duplicating content.
 
 ---
 
@@ -134,7 +183,7 @@ Browser
   │
   ▼
 React / TypeScript SPA
-  │ HTTP / JSON
+  │ HTTP / JSON + bearer session
   ▼
 FastAPI
   │ SQLModel / SQLAlchemy
@@ -145,20 +194,22 @@ PostgreSQL 16
 Alembic
 ```
 
-FlashQuest’s deliberately separates **application liveness** from **dependency readiness**, validates migrations in CI, runs the API container as a non-root user, and keeps durable study state in PostgreSQL while browser-session game feedback remains ephemeral.
+The application separates liveness from database-backed readiness, validates migrations in CI, runs its API container as a non-root user, and keeps durable accounts/decks/cards/progress in PostgreSQL.
 
-[Read the architecture decisions →](PLATFORM_ENGINEERING.md){ .md-button }
+[Architecture decisions →](PLATFORM_ENGINEERING.md){ .md-button }
+[Operations & deployment →](OPERATIONS.md){ .md-button }
 
 ---
 
 ## ✅ Quality gates
 
-Changes are validated across the same boundaries the application depends on:
+Pull requests validate:
 
-1. **Backend** — Python 3.11/3.12, compile, pytest, Ruff correctness, Black formatting.
-2. **Frontend** — clean install, ESLint, TypeScript, Vite production build.
-3. **Database** — clean PostgreSQL 16 + Alembic upgrade to `head`.
-4. **Containers** — Compose validation plus API and web image builds.
-5. **Documentation** — MkDocs + TypeDoc build checks.
+1. backend tests on Python 3.11 and 3.12;
+2. Ruff correctness and Black formatting checks;
+3. frontend ESLint + TypeScript/Vite production build;
+4. Alembic against clean PostgreSQL 16;
+5. Docker Compose + API/web image builds;
+6. strict MkDocs + TypeDoc documentation builds.
 
-That gives FlashQuest’s two jobs at once: **help you study Platform Engineering and give you a Platform Engineering project to talk about.**
+FlashQuest’s is therefore both **a study product** and **a portfolio project demonstrating platform-minded software delivery**.

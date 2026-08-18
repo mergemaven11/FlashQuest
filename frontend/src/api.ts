@@ -1,46 +1,43 @@
 // frontend/src/api.ts
-/**
- * Minimal API client using axios with friendly errors + health check.
- * Base URL comes from Vite env (VITE_API_URL) or defaults to localhost.
- *
- * Also exports spaced-repetition helpers to display bin timers in the UI.
- */
-
 import axios from "axios";
 import type {
-  CardRead,
   CardAdminRead,
-  StudyNext,
+  CardRead,
   CreateCardPayload,
+  DeckRead,
+  LoginPayload,
+  LoginResponse,
+  SignupPayload,
+  StudyNext,
+  UpdateCardPayload,
+  UserRead,
 } from "./types";
 
-/** Map of bin -> delay in milliseconds (must mirror backend schedule). */
+export type StudyTrack = "mixed" | "concept" | "lab";
+const TOKEN_KEY = "flashquest-access-token";
+
 export const BIN_DELAYS: Record<number, number> = {
-  0: 0, // new
-  1: 5_000, // 5s
-  2: 30_000, // 30s
-  3: 5 * 60_000, // 5m
-  4: 30 * 60_000, // 30m
-  5: 2 * 60 * 60_000, // 2h
-  6: 6 * 60 * 60_000, // 6h
-  7: 24 * 60 * 60_000, // 1d
-  8: 2 * 24 * 60 * 60_000, // 2d
-  9: 4 * 24 * 60 * 60_000, // 4d
-  10: 7 * 24 * 60 * 60_000, // 7d (~1w)
-  11: 14 * 24 * 60 * 60_000, // 14d
+  0: 0,
+  1: 5_000,
+  2: 25_000,
+  3: 2 * 60_000,
+  4: 10 * 60_000,
+  5: 60 * 60_000,
+  6: 5 * 60 * 60_000,
+  7: 24 * 60 * 60_000,
+  8: 5 * 24 * 60 * 60_000,
+  9: 25 * 24 * 60 * 60_000,
+  10: 120 * 24 * 60 * 60_000,
+  11: 0,
 };
 
-/**
- * Human-friendly label for a bin’s delay (e.g., "5s", "30m", "2h", "1d").
- * Falls back to "~1m" if bin is unknown.
- */
 export function binLabel(bin: number): string {
+  if (bin === 11) return "mastered";
   const ms = BIN_DELAYS[bin];
   if (ms == null) return "~1m";
   return formatDelay(ms);
 }
 
-/** Format milliseconds into a short relative label (s/m/h/d). */
 export function formatDelay(ms: number): string {
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -48,16 +45,27 @@ export function formatDelay(ms: number): string {
   if (m < 60) return `${m}m`;
   const h = Math.round(m / 60);
   if (h < 24) return `${h}h`;
-  const d = Math.round(h / 24);
-  return `${d}d`;
+  return `${Math.round(h / 24)}d`;
 }
 
-/** Resolve API base URL for diagnostics. */
 export function apiBaseURL(): string {
-  return import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined" && window.location.hostname.endsWith("netlify.app")) {
+    return "https://flashcards-tobias.fly.dev";
+  }
+  return "http://localhost:8080";
 }
 
-/** Axios instance with sane timeout and JSON defaults. */
+export function getAccessToken(): string | null {
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAccessToken(token: string | null): void {
+  if (token) window.localStorage.setItem(TOKEN_KEY, token);
+  else window.localStorage.removeItem(TOKEN_KEY);
+}
+
 export const api = axios.create({
   baseURL: apiBaseURL(),
   timeout: 12_000,
@@ -65,18 +73,20 @@ export const api = axios.create({
   responseType: "json",
 });
 
-/** Log useful info on API failures to help debug quickly in the console. */
+api.interceptors.request.use((config) => {
+  const token = typeof window !== "undefined" ? getAccessToken() : null;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    // Avoid noisy logs for cancellations
     if (axios.isCancel?.(err)) return Promise.reject(err);
-
     console.error("API error:", {
       url: err?.config?.url,
       method: err?.config?.method,
       status: err?.response?.status,
-      headers: err?.response?.headers,
       data: err?.response?.data,
       message: err?.message,
     });
@@ -84,14 +94,11 @@ api.interceptors.response.use(
   }
 );
 
-/** Convert Axios/Network errors to readable messages for the UI. */
 function normalizeError(err: unknown): Error {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status;
-    const detail =
-      (err.response?.data as any)?.detail ??
-      err.response?.statusText ??
-      err.message;
+    const responseData = err.response?.data as { detail?: unknown } | undefined;
+    const detail = responseData?.detail ?? err.response?.statusText ?? err.message;
     return new Error(
       status ? `HTTP ${status}: ${String(detail)}` : `Network: ${String(detail)}`
     );
@@ -99,10 +106,6 @@ function normalizeError(err: unknown): Error {
   return err instanceof Error ? err : new Error("Unknown error");
 }
 
-/**
- * Check API health.
- * @returns `true` if `/health` responds `{ ok: true }`, otherwise `false`.
- */
 export async function checkApi(): Promise<boolean> {
   try {
     const { data } = await api.get<{ ok: boolean }>("/health");
@@ -112,49 +115,125 @@ export async function checkApi(): Promise<boolean> {
   }
 }
 
-/**
- * Get the next study item or a status if none are due.
- * @returns Discriminated union with `status: "ok" | "temporarily_done" | "permanently_done"`.
- */
-export async function getStudyNext(): Promise<StudyNext> {
+export async function signup(payload: SignupPayload): Promise<{ message: string; email: string }> {
   try {
-    const { data } = await api.get<StudyNext>("/study/next");
+    const { data } = await api.post<{ message: string; email: string }>("/auth/signup", payload);
     return data;
   } catch (e) {
     throw normalizeError(e);
   }
 }
 
-/** Response shape for /study/answer. */
+export async function verifyEmail(token: string): Promise<string> {
+  try {
+    const { data } = await api.post<{ message: string }>("/auth/verify", { token });
+    return data.message;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function resendVerification(email: string): Promise<string> {
+  try {
+    const { data } = await api.post<{ message: string }>("/auth/resend-verification", { email });
+    return data.message;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function login(payload: LoginPayload): Promise<LoginResponse> {
+  try {
+    const { data } = await api.post<LoginResponse>("/auth/login", payload);
+    setAccessToken(data.access_token);
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function getMe(): Promise<UserRead> {
+  try {
+    const { data } = await api.get<UserRead>("/auth/me");
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await api.post("/auth/logout");
+  } finally {
+    setAccessToken(null);
+  }
+}
+
+export async function getFeaturedDecks(): Promise<DeckRead[]> {
+  try {
+    const { data } = await api.get<DeckRead[]>("/decks/featured");
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function getMyDecks(): Promise<DeckRead[]> {
+  try {
+    const { data } = await api.get<DeckRead[]>("/decks/mine");
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function createDeck(title: string, description = ""): Promise<DeckRead> {
+  try {
+    const { data } = await api.post<DeckRead>("/decks", { title, description });
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function copyFeaturedDeck(deckId: number): Promise<DeckRead> {
+  try {
+    const { data } = await api.post<DeckRead>(`/decks/${deckId}/copy`);
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function deleteDeck(deckId: number): Promise<void> {
+  try {
+    await api.delete(`/decks/${deckId}`);
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function getStudyNext(
+  track: StudyTrack = "mixed",
+  deckId?: number
+): Promise<StudyNext> {
+  try {
+    const { data } = await api.get<StudyNext>("/study/next", {
+      params: { track, deck_id: deckId },
+    });
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
 export type AnswerResponse = { ok: boolean; to_bin: number; status: string };
 
-/**
- * Submit an answer for a card.
- *
- * Overloads:
- * - `postStudyAnswer(123, "correct")`
- * - `postStudyAnswer({ cardId: 123, result: "correct" })`
- */
-export function postStudyAnswer(
+export async function postStudyAnswer(
   cardId: number,
   result: "correct" | "wrong"
-): Promise<AnswerResponse>;
-export function postStudyAnswer(args: {
-  cardId: number;
-  result: "correct" | "wrong";
-}): Promise<AnswerResponse>;
-export async function postStudyAnswer(
-  a:
-    | number
-    | {
-        cardId: number;
-        result: "correct" | "wrong";
-      },
-  b?: "correct" | "wrong"
 ): Promise<AnswerResponse> {
   try {
-    const cardId = typeof a === "number" ? a : a.cardId;
-    const result = typeof a === "number" ? (b as "correct" | "wrong") : a.result;
     const { data } = await api.post<AnswerResponse>("/study/answer", null, {
       params: { card_id: cardId, result },
     });
@@ -164,10 +243,6 @@ export async function postStudyAnswer(
   }
 }
 
-/**
- * Create a new card (word + definition).
- * @param payload - The card data.
- */
 export async function createCard(payload: CreateCardPayload): Promise<CardRead> {
   try {
     const { data } = await api.post<CardRead>("/cards", payload);
@@ -177,14 +252,19 @@ export async function createCard(payload: CreateCardPayload): Promise<CardRead> 
   }
 }
 
-/**
- * List admin cards (with bin/status). Optional search query.
- * @param q - Case-insensitive match on word/definition.
- */
-export async function listAdminCards(q?: string): Promise<CardAdminRead[]> {
+export async function updateCard(id: number, payload: UpdateCardPayload): Promise<CardRead> {
+  try {
+    const { data } = await api.patch<CardRead>(`/cards/${id}`, payload);
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function listAdminCards(q?: string, deckId?: number): Promise<CardAdminRead[]> {
   try {
     const { data } = await api.get<CardAdminRead[]>("/cards/admin", {
-      params: q ? { q } : undefined,
+      params: { q: q || undefined, deck_id: deckId },
     });
     return data;
   } catch (e) {
@@ -192,40 +272,27 @@ export async function listAdminCards(q?: string): Promise<CardAdminRead[]> {
   }
 }
 
-/**
- * Reset ALL progress for the default user on the backend.
- * - Ensures a UserCard exists for every Card
- * - Deletes all Review rows
- * - Resets bin/wrong_count/next_review_at/status on UserCard
- * @returns counts of affected rows
- */
-export async function adminReset(): Promise<{
+export async function adminReset(password: string): Promise<{
   ok: boolean;
   inserted_usercards: number;
   deleted_reviews: number;
   updated_usercards: number;
 }> {
   try {
-    const { data } = await api.post("/cards/admin/reset");
-    return data as {
-      ok: boolean;
-      inserted_usercards: number;
-      deleted_reviews: number;
-      updated_usercards: number;
-    };
+    const { data } = await api.post("/cards/admin/reset", null, {
+      headers: { "X-Demo-Admin-Password": password },
+    });
+    return data;
   } catch (e) {
     throw normalizeError(e);
   }
 }
 
-/**
- * Delete a card by ID.
- * Also removes associated per-user progress/reviews if your backend cascades.
- * @throws Error with readable message when the API rejects the request.
- */
-export async function deleteCard(id: number): Promise<void> {
+export async function deleteCard(id: number, password?: string): Promise<void> {
   try {
-    await api.delete(`/cards/${id}`);
+    await api.delete(`/cards/${id}`, {
+      headers: password ? { "X-Demo-Admin-Password": password } : undefined,
+    });
   } catch (e) {
     throw normalizeError(e);
   }

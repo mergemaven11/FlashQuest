@@ -1,126 +1,176 @@
-"""Database and Pydantic models for the flashcards app.
-
-This module defines:
-- SQLModel ORM tables (Card, UserCard, Review)
-- Pydantic schemas for requests/responses (CardCreate, CardRead, CardAdminRead, CardUpdate, CardStats)
-
-Notes:
-    We explicitly set `sa_type=` on fields so Alembic autogenerate emits plain
-    SQLAlchemy types (e.g., `sa.String`) instead of `AutoString`.
-"""
+"""Database and API models for FlashQuest’s reusable study engine."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 import sqlalchemy as sa
-from sqlmodel import SQLModel, Field
+from pydantic import EmailStr
+from sqlmodel import Field, SQLModel
+
+
+def utc_now() -> datetime:
+    """Return a timezone-aware UTC timestamp."""
+    return datetime.now(timezone.utc)
+
+
+class User(SQLModel, table=True):
+    """A FlashQuest account. Email must be verified before deck creation."""
+
+    __tablename__ = "app_user"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, sa_type=sa.String)
+    display_name: str = Field(sa_type=sa.String)
+    password_hash: str = Field(sa_type=sa.String)
+    is_verified: bool = Field(default=False, index=True, sa_type=sa.Boolean)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
+
+
+class UserRead(SQLModel):
+    id: int
+    email: EmailStr
+    display_name: str
+    is_verified: bool
+
+
+class SignupRequest(SQLModel):
+    display_name: str
+    email: EmailStr
+    password: str
+
+
+class LoginRequest(SQLModel):
+    email: EmailStr
+    password: str
+
+
+class AuthSession(SQLModel, table=True):
+    """Hashed opaque bearer session. Raw tokens are never stored."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="app_user.id", index=True, sa_type=sa.Integer)
+    token_hash: str = Field(index=True, sa_type=sa.String)
+    expires_at: datetime = Field(sa_type=sa.DateTime(timezone=True))
+    created_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
+    revoked_at: Optional[datetime] = Field(default=None, sa_type=sa.DateTime(timezone=True))
+
+
+class EmailVerificationToken(SQLModel, table=True):
+    """One-time hashed token used to verify an account email address."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="app_user.id", index=True, sa_type=sa.Integer)
+    token_hash: str = Field(index=True, sa_type=sa.String)
+    expires_at: datetime = Field(sa_type=sa.DateTime(timezone=True))
+    created_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
+    used_at: Optional[datetime] = Field(default=None, sa_type=sa.DateTime(timezone=True))
+
+
+class DeckBase(SQLModel):
+    title: str
+    description: str = ""
+
+
+class DeckCreate(DeckBase):
+    """Payload for a verified user to create a custom deck."""
+
+
+class DeckUpdate(SQLModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
+class DeckRead(DeckBase):
+    id: int
+    slug: str
+    is_builtin: bool
+    owner_id: Optional[int]
+    card_count: int = 0
+    created_at: datetime
+
+
+class Deck(SQLModel, table=True):
+    """A topic pack. Built-ins are public; custom decks belong to one user."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: Optional[int] = Field(
+        default=None, foreign_key="app_user.id", index=True, sa_type=sa.Integer
+    )
+    title: str = Field(index=True, sa_type=sa.String)
+    slug: str = Field(index=True, sa_type=sa.String)
+    description: str = Field(default="", sa_type=sa.String)
+    is_builtin: bool = Field(default=False, index=True, sa_type=sa.Boolean)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
 
 
 class CardBase(SQLModel):
-    """Base fields shared by Card schemas.
-
-    Attributes:
-        word: The vocabulary term.
-        definition: The meaning of the term.
-    """
+    """Fields shared by card create/read models."""
 
     word: str
     definition: str
+    domain: str = "General"
+    kind: str = "concept"
 
 
 class CardCreate(CardBase):
-    """Payload schema used to create a new card.
+    """Payload used to create a card inside an owned deck."""
 
-    Inherits:
-        CardBase
-    """
-
-    pass
+    deck_id: int
 
 
 class CardRead(CardBase):
-    """Response schema for reading a card.
-
-    Attributes:
-        id: Primary key of the card.
-        created_at: Timestamp when the card was created (UTC).
-    """
+    """Public card representation."""
 
     id: int
+    deck_id: Optional[int] = None
+    topic: str = "Custom"
     created_at: datetime
+    is_builtin: bool = False
 
 
-class CardAdminRead(SQLModel):
-    """Admin response schema with per-user study state.
+class CardAdminRead(CardRead):
+    """Card representation with spaced-repetition state."""
 
-    Attributes:
-        id: Card id.
-        word: The vocabulary term.
-        definition: The meaning of the term.
-        created_at: Card creation timestamp (UTC).
-        bin: Current spaced-repetition bin for the default user (0–11).
-        status: 'active', 'never', or 'hard_to_remember'.
-    """
-
-    id: int
-    word: str
-    definition: str
-    created_at: datetime
     bin: int
     status: str
 
 
 class CardUpdate(SQLModel):
-    """PATCH/PUT schema for updating a card.
-
-    Notes:
-        All fields are optional to support partial updates.
-
-    Attributes:
-        word: Optional new word value.
-        definition: Optional new definition value.
-    """
+    """Fields a user may customize on an owned card."""
 
     word: Optional[str] = None
     definition: Optional[str] = None
+    domain: Optional[str] = None
+    kind: Optional[str] = None
 
 
 class Card(SQLModel, table=True):
-    """ORM model representing a vocabulary flashcard.
-
-    Attributes:
-        id: Primary key.
-        word: The vocabulary term.
-        definition: The meaning of the term.
-        created_at: UTC timestamp when the card was created.
-    """
+    """A study card belonging to a built-in or user-owned deck."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    deck_id: Optional[int] = Field(
+        default=None, foreign_key="deck.id", index=True, sa_type=sa.Integer
+    )
     word: str = Field(sa_type=sa.String)
     definition: str = Field(sa_type=sa.String)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        sa_type=sa.DateTime(timezone=True),
-    )
+    # `topic` remains denormalized for backwards-compatible exports and diagnostics.
+    topic: str = Field(default="Custom", index=True, sa_type=sa.String)
+    domain: str = Field(default="General", index=True, sa_type=sa.String)
+    kind: str = Field(default="concept", index=True, sa_type=sa.String)
+    is_builtin: bool = Field(default=False, index=True, sa_type=sa.Boolean)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
 
 
 class UserCard(SQLModel, table=True):
-    """ORM model tracking a user's progress on a specific card.
+    """Per-user spaced-repetition state for a card.
 
-    Attributes:
-        id: Primary key.
-        user_id: User identifier (MVP uses default=1).
-        card_id: Foreign key to `Card.id`.
-        bin: Current spaced-repetition bin (0–11).
-        wrong_count: Lifetime count of incorrect answers.
-        next_review_at: Next time the card becomes due (UTC).
-        status: 'active', 'never', or 'hard_to_remember'.
+    User id 0 is reserved for the anonymous public demo. Authenticated users start at 1.
     """
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[int] = Field(default=1, index=True, sa_type=sa.Integer)
+    user_id: Optional[int] = Field(default=0, index=True, sa_type=sa.Integer)
     card_id: int = Field(foreign_key="card.id", index=True, sa_type=sa.Integer)
     bin: int = Field(default=0, sa_type=sa.Integer)
     wrong_count: int = Field(default=0, sa_type=sa.Integer)
@@ -131,40 +181,19 @@ class UserCard(SQLModel, table=True):
 
 
 class Review(SQLModel, table=True):
-    """ORM model recording an individual study attempt.
-
-    Attributes:
-        id: Primary key.
-        card_id: Foreign key to `Card.id`.
-        user_id: User identifier (MVP uses default=1).
-        result: 'correct' or 'wrong'.
-        from_bin: Bin before the answer.
-        to_bin: Bin after applying the answer.
-        created_at: UTC timestamp when the review was recorded.
-    """
+    """Audit record for one answer in the study loop."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     card_id: int = Field(foreign_key="card.id", sa_type=sa.Integer)
-    user_id: Optional[int] = Field(default=1, index=True, sa_type=sa.Integer)
+    user_id: Optional[int] = Field(default=0, index=True, sa_type=sa.Integer)
     result: str = Field(sa_type=sa.String)
     from_bin: int = Field(sa_type=sa.Integer)
     to_bin: int = Field(sa_type=sa.Integer)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        sa_type=sa.DateTime(timezone=True),
-    )
+    created_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
 
 
 class CardStats(SQLModel):
-    """Aggregated stats for admin dashboard.
-
-    Attributes:
-        total_cards: Number of cards tracked for the default user.
-        active: Count of cards with status 'active'.
-        never: Count of cards with status 'never' (last bin).
-        hard_to_remember: Count of cards hidden due to many wrong answers.
-        by_bin: A mapping of bin index (0..11) to count.
-    """
+    """Aggregated study stats for the selected user/deck."""
 
     total_cards: int
     active: int

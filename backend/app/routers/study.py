@@ -1,29 +1,28 @@
-# app/routers/study.py
+"""Spaced-repetition study routes for featured and user-owned decks."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, asc, desc, func
 from sqlmodel import Session, select
-from sqlalchemy import asc, desc, func, and_
 
 from ..db import get_session
-from ..models import UserCard, Card, Review
+from ..models import Card, Deck, Review, User, UserCard
+from ..security import DEMO_USER_ID, get_optional_user
 
 router = APIRouter(prefix="/study", tags=["study"])
-DEFAULT_USER_ID = 1
+VALID_TRACKS = {"mixed", "concept", "lab"}
 
 
-# ---------- Time helpers (timezone-aware UTC) ----------
 def _now_utc() -> datetime:
-    """Return timezone-aware UTC datetime."""
     return datetime.now(timezone.utc)
 
 
-# Spec-accurate bin delays (bins 1–11); bin 11 = never
 BIN_DELAYS: dict[int, Optional[timedelta]] = {
-    0: timedelta(seconds=0),  # new
+    0: timedelta(seconds=0),
     1: timedelta(seconds=5),
     2: timedelta(seconds=25),
     3: timedelta(minutes=2),
@@ -33,161 +32,208 @@ BIN_DELAYS: dict[int, Optional[timedelta]] = {
     7: timedelta(days=1),
     8: timedelta(days=5),
     9: timedelta(days=25),
-    10: timedelta(days=120),  # ~4 months
-    11: None,  # never
+    10: timedelta(days=120),
+    11: None,
 }
 
 
 def _fallback_delay_for_bin(b: int) -> Optional[timedelta]:
-    """Return the spec delay for a bin; None means 'never'."""
     return BIN_DELAYS.get(int(b), timedelta(minutes=1))
 
 
 def _next_review_at_from_bin(b: int) -> Optional[datetime]:
-    """Compute next review time as timezone-aware UTC; None for 'never'."""
     delay = _fallback_delay_for_bin(b)
     return None if delay is None else _now_utc() + delay
 
 
-# ---------- Selection logic ----------
-def _select_next_card_pair(session: Session) -> Optional[tuple[Card, UserCard]]:
-    """
-    Select the next card for the default user to study.
+def _card_filters(deck_id: int | None, track: str) -> list[Any]:
+    filters: list[Any] = []
+    if deck_id is not None:
+        filters.append(Card.deck_id == deck_id)
+    if track in {"concept", "lab"}:
+        filters.append(Card.kind == track)
+    return filters
 
-    Selection priority:
-      1) Any due active card (next_review_at <= now), preferring:
-         - Higher bin numbers first
-         - Then earliest due time
-         - Then lowest Card.id (stable)
-      2) If no due cards, return the newest "new" card:
-         - bin = 0 and next_review_at IS NULL
-         - Ordered by created_at DESC, then Card.id DESC
-    """
-    # Cast ORM attributes to SQL expressions for mypy
+
+def _select_next_card_pair(
+    session: Session,
+    user_id: int = DEMO_USER_ID,
+    deck_id: int | None = None,
+    track: str = "mixed",
+) -> Optional[tuple[Card, UserCard]]:
+    """Select the next due/new card for one user, deck, and learning mode."""
     nr = cast(Any, UserCard.next_review_at)
     b = cast(Any, UserCard.bin)
     cid = cast(Any, Card.id)
     created = cast(Any, Card.created_at)
     uc_card_id = cast(Any, UserCard.card_id)
+    card_filters = _card_filters(deck_id, track)
 
-    # 1) due active card(s): prefer higher bin, then earliest due
+    due_conditions: list[Any] = [
+        UserCard.user_id == user_id,
+        UserCard.status == "active",
+        and_(nr.is_not(None), nr <= func.now()),
+        *card_filters,
+    ]
+    new_conditions: list[Any] = [
+        UserCard.user_id == user_id,
+        UserCard.status == "active",
+        cast(Any, UserCard.bin) == 0,
+        nr.is_(None),
+        *card_filters,
+    ]
+
     due_stmt = (
         select(Card, UserCard)
-        .join(UserCard, uc_card_id == cid)  # casted ON clause
-        .where(
-            UserCard.user_id == DEFAULT_USER_ID,
-            UserCard.status == "active",
-            and_(nr.is_not(None), nr <= func.now()),
-        )
-        .order_by(
-            desc(b),  # prefer higher bin
-            asc(nr),  # then earliest due
-            asc(cid),  # stable tiebreaker
-        )
+        .join(UserCard, uc_card_id == cid)
+        .where(*due_conditions)
+        .order_by(desc(b), asc(nr), asc(cid))
         .limit(1)
     )
     due_row = session.exec(due_stmt).first()
     if due_row:
-        return due_row  # (Card, UserCard)
+        return due_row
 
-    # 2) newest "new" bin-0 card (next_review_at is NULL)
     new_stmt = (
         select(Card, UserCard)
-        .join(UserCard, uc_card_id == cid)  # casted ON clause
-        .where(
-            UserCard.user_id == DEFAULT_USER_ID,
-            UserCard.status == "active",
-            cast(Any, UserCard.bin) == 0,  # cast to avoid bool typing
-            nr.is_(None),
-        )
+        .join(UserCard, uc_card_id == cid)
+        .where(*new_conditions)
         .order_by(desc(created), desc(cid))
         .limit(1)
     )
-    new_row = session.exec(new_stmt).first()
-    if new_row:
-        return new_row
-
-    return None
+    return session.exec(new_stmt).first()
 
 
-# --- Public function expected by tests ---
 def select_next_card(session: Session) -> Optional[Card]:
-    """Return only the Card (or None) using the same priority as _select_next_card_pair."""
+    """Compatibility helper used by unit tests."""
     pair = _select_next_card_pair(session)
     return pair[0] if pair else None
 
 
-# ---------- Routes ----------
-@router.get("/next")
-def study_next(session: Session = Depends(get_session)) -> dict[str, Any]:
-    """
-    Return the next card to study for the default user.
-
-    - If there are no ACTIVE cards at all -> {"status":"permanently_done"}
-    - Else if there are ACTIVE cards but none due/new -> {"status":"temporarily_done"}
-    - Else -> {"status":"ok", "card": {...}}
-    """
-    # 0) If there are no ACTIVE cards, we are permanently done
-    has_active = session.exec(
-        select(UserCard.id).where(
-            UserCard.user_id == DEFAULT_USER_ID,
-            UserCard.status == "active",
-        )
+def _default_featured_deck(session: Session) -> Deck | None:
+    return session.exec(
+        select(Deck).where(Deck.is_builtin == True).order_by(Deck.id)  # noqa: E712
     ).first()
-    if has_active is None:
-        return {"status": "permanently_done"}
 
-    # 1) Try to pick a due/new active card
-    pair = _select_next_card_pair(session)
+
+def _resolve_deck(
+    session: Session, deck_id: int | None, user: User | None
+) -> tuple[Deck, int]:
+    deck = session.get(Deck, deck_id) if deck_id is not None else _default_featured_deck(session)
+    if deck is None:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    if not deck.is_builtin:
+        if user is None:
+            raise HTTPException(status_code=401, detail="Sign in to study this deck")
+        if deck.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="This deck belongs to another account")
+    user_id = int(user.id or 0) if user is not None else DEMO_USER_ID
+    return deck, user_id
+
+
+def _ensure_progress(session: Session, user_id: int, deck_id: int) -> None:
+    """Create missing per-user progress rows for every card in a selected deck."""
+    card_ids = list(session.exec(select(Card.id).where(Card.deck_id == deck_id)).all())
+    if not card_ids:
+        return
+    existing = set(
+        session.exec(
+            select(UserCard.card_id).where(
+                UserCard.user_id == user_id,
+                cast(Any, UserCard.card_id).in_(card_ids),
+            )
+        ).all()
+    )
+    missing = [card_id for card_id in card_ids if card_id not in existing]
+    for card_id in missing:
+        session.add(UserCard(user_id=user_id, card_id=card_id, bin=0))
+    if missing:
+        session.commit()
+
+
+@router.get("/next")
+def study_next(
+    deck_id: int | None = Query(None, description="Featured or owned deck id"),
+    track: str = Query(
+        "mixed",
+        description="Study track: mixed, concept, or lab",
+        pattern="^(mixed|concept|lab)$",
+    ),
+    user: User | None = Depends(get_optional_user),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Return the next due/new card for a featured or owned deck."""
+    if track not in VALID_TRACKS:
+        raise HTTPException(status_code=422, detail="invalid study track")
+
+    deck, user_id = _resolve_deck(session, deck_id, user)
+    resolved_deck_id = int(deck.id or 0)
+    _ensure_progress(session, user_id, resolved_deck_id)
+
+    pair = _select_next_card_pair(session, user_id, resolved_deck_id, track)
     if pair:
         card, uc = pair
         return {
             "status": "ok",
+            "deck": {
+                "id": resolved_deck_id,
+                "title": deck.title,
+                "is_builtin": deck.is_builtin,
+            },
             "card": {
                 "id": card.id,
+                "deck_id": card.deck_id,
                 "word": card.word,
                 "definition": card.definition,
+                "topic": card.topic,
+                "domain": card.domain,
+                "kind": card.kind,
+                "is_builtin": card.is_builtin,
                 "bin": uc.bin,
                 "status": uc.status,
             },
         }
 
-    # 2) We have active cards but none are due/new right now
-    return {"status": "temporarily_done"}
+    active = session.exec(
+        select(UserCard.id)
+        .join(Card, UserCard.card_id == Card.id)
+        .where(
+            UserCard.user_id == user_id,
+            UserCard.status == "active",
+            Card.deck_id == resolved_deck_id,
+            *_card_filters(None, track),
+        )
+    ).first()
+    return {"status": "permanently_done" if active is None else "temporarily_done"}
 
 
 @router.post("/answer")
 def submit_answer(
-    card_id: int = Query(..., description="Card ID to answer"),
-    result: str = Query(..., description="'correct' or 'wrong'"),
+    card_id: int = Query(...),
+    result: str = Query(..., pattern="^(correct|wrong)$"),
+    user: User | None = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """
-    Accept an answer and update spaced-repetition state.
+    """Update spaced-repetition state for the current demo/account user."""
+    if result not in {"correct", "wrong"}:
+        raise HTTPException(status_code=422, detail="result must be 'correct' or 'wrong'")
 
-    Query Args:
-        card_id: Card to answer.
-        result: 'correct' or 'wrong'.
-
-    Returns:
-        {"ok": True, "to_bin": int, "status": "active|hard_to_remember|never"}
-    """
-    if result not in ("correct", "wrong"):
-        raise HTTPException(
-            status_code=422, detail="result must be 'correct' or 'wrong'"
-        )
+    card = session.get(Card, card_id)
+    if card is None or card.deck_id is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    _deck, user_id = _resolve_deck(session, card.deck_id, user)
+    _ensure_progress(session, user_id, card.deck_id)
 
     uc = session.exec(
         select(UserCard).where(
             UserCard.card_id == card_id,
-            UserCard.user_id == DEFAULT_USER_ID,
+            UserCard.user_id == user_id,
         )
     ).first()
-    if not uc:
-        raise HTTPException(status_code=404, detail="Card not found")
+    if uc is None:
+        raise HTTPException(status_code=404, detail="Study progress not found")
 
     from_bin = uc.bin
-
     if result == "correct":
         uc.bin = min(uc.bin + 1, 11)
     else:
@@ -196,10 +242,7 @@ def submit_answer(
         if uc.wrong_count >= 10:
             uc.status = "hard_to_remember"
 
-    # Compute next review time per spec (bin 11 => never/None)
     uc.next_review_at = _next_review_at_from_bin(uc.bin)
-
-    # If card reached bin 11, mark never and clear next review (per spec)
     if uc.bin == 11:
         uc.status = "never"
         uc.next_review_at = None
@@ -207,7 +250,7 @@ def submit_answer(
     session.add(
         Review(
             card_id=card_id,
-            user_id=DEFAULT_USER_ID,
+            user_id=user_id,
             result=result,
             from_bin=from_bin,
             to_bin=uc.bin,
@@ -216,5 +259,4 @@ def submit_answer(
     )
     session.add(uc)
     session.commit()
-
     return {"ok": True, "to_bin": uc.bin, "status": uc.status}

@@ -1,43 +1,96 @@
-/**
- * Shared DTOs that mirror the backend responses.
- * Keep these in sync with FastAPI response models.
- */
+/** Shared DTOs that mirror the FastAPI responses. */
 
-/** ISO8601 date string (e.g., "2025-08-18T12:34:56Z"). */
 export type ISODate = string;
+export type CardKind = "concept" | "lab";
 
-/** Read-only card view returned by API. */
-export interface CardRead {
+export interface UserRead {
   id: number;
-  word: string;
-  definition: string;
+  email: string;
+  display_name: string;
+  is_verified: boolean;
+}
+
+export interface DeckRead {
+  id: number;
+  owner_id: number | null;
+  title: string;
+  slug: string;
+  description: string;
+  is_builtin: boolean;
+  card_count: number;
   created_at: ISODate;
 }
 
-/** Admin view extends CardRead with study state. */
+export interface CardRead {
+  id: number;
+  deck_id: number | null;
+  word: string;
+  definition: string;
+  topic: string;
+  domain: string;
+  kind: CardKind | string;
+  is_builtin: boolean;
+  created_at: ISODate;
+}
+
 export interface CardAdminRead extends CardRead {
   bin: number;
   status: "active" | "never" | "hard_to_remember" | string;
 }
 
-/** Study-next response variants (discriminated by `status`). */
 export type StudyNextOK = {
   status: "ok";
+  deck: {
+    id: number;
+    title: string;
+    is_builtin: boolean;
+  };
   card: {
     id: number;
+    deck_id: number | null;
     word: string;
     definition: string;
+    topic: string;
+    domain: string;
+    kind: CardKind | string;
+    is_builtin: boolean;
     bin: number;
     status: "active" | "never" | "hard_to_remember" | string;
   };
 };
+
 export type StudyNextTemporary = { status: "temporarily_done" };
 export type StudyNextPermanent = { status: "permanently_done" };
 export type StudyNext = StudyNextOK | StudyNextTemporary | StudyNextPermanent;
 
-/** Payload for creating a new card. */
 export interface CreateCardPayload {
+  deck_id: number;
   word: string;
   definition: string;
+  domain?: string;
+  kind?: CardKind;
 }
 
+export interface UpdateCardPayload {
+  word?: string;
+  definition?: string;
+  domain?: string;
+  kind?: CardKind;
+}
+
+export interface SignupPayload {
+  display_name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: "bearer";
+  user: UserRead;
+}
