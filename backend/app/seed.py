@@ -1,16 +1,17 @@
-"""Seed the built-in Platform Engineering concept and lab deck.
+"""Seed FlashQuest Official curricula into the configured database.
 
 Run with Docker:
     docker compose exec api python -m app.seed
 
-The seed operation is idempotent: the featured deck and cards are reused,
-metadata is repaired, and missing anonymous-demo study state is created without
-duplicates.
+The registry is intentionally data-driven: each curriculum is versioned JSON,
+validated before use, and seeded idempotently. Official decks are repaired in
+place while user-created decks are never touched.
 """
 
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -22,22 +23,47 @@ from .models import Card, Deck, UserCard, utc_now
 DATA_DIR = Path(__file__).parent / "data"
 CONCEPT_DECK_PATH = DATA_DIR / "platform_engineering_cards.json"
 LAB_DECK_PATH = DATA_DIR / "platform_engineering_labs.json"
-PLATFORM_TOPIC = "Platform Engineering"
-PLATFORM_SLUG = "platform-engineering"
-PLATFORM_SUBJECT = "Technology"
-PLATFORM_DIFFICULTY = "intermediate"
-PLATFORM_TAGS = ["platform engineering", "devops", "cloud", "sre"]
 DEMO_USER_ID = 0
 
 
+@dataclass(frozen=True)
+class CurriculumSource:
+    """One versioned curriculum file and the card kind it represents."""
+
+    path: Path
+    kind: str = "concept"
+
+
+@dataclass(frozen=True)
+class CurriculumSpec:
+    """Registry metadata for one protected FlashQuest Official deck."""
+
+    slug: str
+    title: str
+    description: str
+    subject: str
+    difficulty: str
+    tags: tuple[str, ...]
+    sources: tuple[CurriculumSource, ...]
+
+
 def load_deck(path: Path) -> dict[str, list[tuple[str, str]]]:
-    """Load and validate a versioned FlashQuest curriculum file."""
+    """Load and validate one versioned FlashQuest curriculum file."""
     payload: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    version = int(payload.get("version", 0))
+    if version < 1:
+        raise ValueError(f"Curriculum {path.name} must declare version >= 1")
+
     domains: dict[str, list[tuple[str, str]]] = {}
     prompts: set[str] = set()
 
     for domain in payload.get("domains", []):
-        name = str(domain["name"])
+        name = str(domain["name"]).strip()
+        if not name:
+            raise ValueError(f"Empty domain name in {path.name}")
+        if name in domains:
+            raise ValueError(f"Duplicate domain in {path.name}: {name}")
+
         cards: list[tuple[str, str]] = []
         for card in domain.get("cards", []):
             prompt = str(card["prompt"]).strip()
@@ -57,6 +83,8 @@ def load_deck(path: Path) -> dict[str, list[tuple[str, str]]]:
             f"Curriculum card_count mismatch in {path.name}: "
             f"expected {expected}, found {actual}"
         )
+    if actual < 1:
+        raise ValueError(f"Curriculum {path.name} must contain at least one card")
 
     return domains
 
@@ -86,71 +114,145 @@ PLATFORM_ENGINEERING_LAB_DECK = flatten_deck(PLATFORM_ENGINEERING_LABS_BY_DOMAIN
 PLATFORM_ENGINEERING_DECK = (
     PLATFORM_ENGINEERING_CONCEPT_DECK + PLATFORM_ENGINEERING_LAB_DECK
 )
-PLATFORM_ENGINEERING_METADATA = {
-    **deck_metadata(PLATFORM_ENGINEERING_DECK_BY_DOMAIN, "concept"),
-    **deck_metadata(PLATFORM_ENGINEERING_LABS_BY_DOMAIN, "lab"),
-}
 
-if len({prompt for prompt, _ in PLATFORM_ENGINEERING_DECK}) != len(
-    PLATFORM_ENGINEERING_DECK
-):
-    raise ValueError("Duplicate prompts exist across concept and lab decks")
-
-
-def _featured_deck(session: Session) -> Deck:
-    """Create or repair the public Official Platform Engineering deck."""
-    deck = session.exec(select(Deck).where(Deck.slug == PLATFORM_SLUG)).first()
-    description = (
+PLATFORM_ENGINEERING_SPEC = CurriculumSpec(
+    slug="platform-engineering",
+    title="Platform Engineering",
+    description=(
         "216 Platform Engineering challenges: 144 concepts and 72 hands-on "
         "break/fix labs across 12 domains."
-    )
+    ),
+    subject="Technology",
+    difficulty="intermediate",
+    tags=("platform engineering", "devops", "cloud", "sre"),
+    sources=(
+        CurriculumSource(CONCEPT_DECK_PATH, "concept"),
+        CurriculumSource(LAB_DECK_PATH, "lab"),
+    ),
+)
+
+OFFICIAL_CURRICULA: tuple[CurriculumSpec, ...] = (
+    PLATFORM_ENGINEERING_SPEC,
+    CurriculumSpec(
+        slug="docker-fundamentals",
+        title="Docker Fundamentals",
+        description="30 beginner-friendly Docker concepts covering containers, images, builds, storage, networking, Compose, and everyday operations.",
+        subject="Technology",
+        difficulty="beginner",
+        tags=("docker", "containers", "devops", "images"),
+        sources=(CurriculumSource(DATA_DIR / "docker_fundamentals.json"),),
+    ),
+    CurriculumSpec(
+        slug="linux-fundamentals",
+        title="Linux Fundamentals",
+        description="30 core Linux concepts covering files, permissions, processes, services, shell tools, networking, packages, and troubleshooting.",
+        subject="Technology",
+        difficulty="beginner",
+        tags=("linux", "shell", "operating systems", "cli"),
+        sources=(CurriculumSource(DATA_DIR / "linux_fundamentals.json"),),
+    ),
+    CurriculumSpec(
+        slug="math-fundamentals",
+        title="Math Fundamentals",
+        description="30 approachable math foundations spanning number sense, fractions, percentages, algebra, geometry, measurement, data, and probability.",
+        subject="Mathematics",
+        difficulty="beginner",
+        tags=("math", "algebra", "fractions", "probability"),
+        sources=(CurriculumSource(DATA_DIR / "math_fundamentals.json"),),
+    ),
+    CurriculumSpec(
+        slug="accounting-fundamentals",
+        title="Accounting Fundamentals",
+        description="30 foundational accounting concepts covering the accounting equation, debits and credits, financial statements, accruals, inventory, cash, and basic analysis.",
+        subject="Accounting",
+        difficulty="beginner",
+        tags=("accounting", "bookkeeping", "financial statements", "business"),
+        sources=(CurriculumSource(DATA_DIR / "accounting_fundamentals.json"),),
+    ),
+    CurriculumSpec(
+        slug="intro-us-law",
+        title="Intro to U.S. Law",
+        description=(
+            "30 general educational concepts about the U.S. legal system, constitutional structure, civil and criminal law, contracts, torts, and legal process. "
+            "Laws vary by jurisdiction and change over time; this study deck is not legal advice."
+        ),
+        subject="Law",
+        difficulty="beginner",
+        tags=("law", "us law", "legal concepts", "civics"),
+        sources=(CurriculumSource(DATA_DIR / "intro_us_law.json"),),
+    ),
+)
+
+
+def _curriculum_rows(
+    spec: CurriculumSpec,
+) -> list[tuple[str, str, str, str]]:
+    """Return prompt, answer, domain, kind rows and reject cross-source duplicates."""
+    rows: list[tuple[str, str, str, str]] = []
+    prompts: set[str] = set()
+    for source in spec.sources:
+        domains = load_deck(source.path)
+        for domain, cards in domains.items():
+            for prompt, answer in cards:
+                if prompt in prompts:
+                    raise ValueError(
+                        f"Duplicate prompt across sources for {spec.slug}: {prompt}"
+                    )
+                prompts.add(prompt)
+                rows.append((prompt, answer, domain, source.kind))
+    return rows
+
+
+def _official_deck(session: Session, spec: CurriculumSpec) -> Deck:
+    """Create or repair one public protected Official deck."""
+    deck = session.exec(select(Deck).where(Deck.slug == spec.slug)).first()
+    desired = {
+        "owner_id": None,
+        "title": spec.title,
+        "description": spec.description,
+        "is_builtin": True,
+        "subject": spec.subject,
+        "difficulty": spec.difficulty,
+        "visibility": "public",
+        "tags": list(spec.tags),
+    }
+
     if deck is None:
-        deck = Deck(
-            owner_id=None,
-            title=PLATFORM_TOPIC,
-            slug=PLATFORM_SLUG,
-            description=description,
-            is_builtin=True,
-            subject=PLATFORM_SUBJECT,
-            difficulty=PLATFORM_DIFFICULTY,
-            visibility="public",
-            tags=list(PLATFORM_TAGS),
-        )
+        deck = Deck(slug=spec.slug, **desired)
         session.add(deck)
         session.flush()
         deck.published_at = deck.created_at
         session.add(deck)
         session.flush()
-    else:
-        desired = {
-            "owner_id": None,
-            "title": PLATFORM_TOPIC,
-            "description": description,
-            "is_builtin": True,
-            "subject": PLATFORM_SUBJECT,
-            "difficulty": PLATFORM_DIFFICULTY,
-            "visibility": "public",
-            "tags": list(PLATFORM_TAGS),
-        }
-        changed = False
-        for field, value in desired.items():
-            if getattr(deck, field) != value:
-                setattr(deck, field, value)
-                changed = True
-        if deck.published_at is None:
-            deck.published_at = deck.created_at
+        return deck
+
+    changed = False
+    for field, value in desired.items():
+        if getattr(deck, field) != value:
+            setattr(deck, field, value)
             changed = True
-        if changed:
-            deck.updated_at = utc_now()
-            session.add(deck)
-            session.flush()
+    if deck.published_at is None:
+        deck.published_at = deck.created_at
+        changed = True
+    if changed:
+        deck.updated_at = utc_now()
+        session.add(deck)
+        session.flush()
     return deck
 
 
-def seed_platform_deck(session: Session) -> dict[str, int]:
-    """Insert or repair the built-in Platform Engineering demo deck."""
-    deck = _featured_deck(session)
-    existing_cards = {card.word: card for card in session.exec(select(Card)).all()}
+def seed_curriculum(session: Session, spec: CurriculumSpec) -> dict[str, int | str]:
+    """Insert or repair one Official curriculum without touching other decks."""
+    rows = _curriculum_rows(spec)
+    deck = _official_deck(session, spec)
+    deck_id = int(deck.id or 0)
+
+    # Prompt identity is scoped to the deck. Different subjects may legitimately
+    # use the same wording without colliding during seed repair.
+    existing_cards = {
+        card.word: card
+        for card in session.exec(select(Card).where(Card.deck_id == deck_id)).all()
+    }
     existing_progress_ids = set(
         session.exec(
             select(UserCard.card_id).where(UserCard.user_id == DEMO_USER_ID)
@@ -161,16 +263,22 @@ def seed_platform_deck(session: Session) -> dict[str, int]:
     existing_count = 0
     updated_cards = 0
     created_progress = 0
+    concept_cards = 0
+    lab_cards = 0
 
-    for prompt, answer in PLATFORM_ENGINEERING_DECK:
-        domain, kind = PLATFORM_ENGINEERING_METADATA[prompt]
+    for prompt, answer, domain, kind in rows:
+        if kind == "lab":
+            lab_cards += 1
+        else:
+            concept_cards += 1
+
         card = existing_cards.get(prompt)
         if card is None:
             card = Card(
-                deck_id=deck.id,
+                deck_id=deck_id,
                 word=prompt,
                 definition=answer,
-                topic=PLATFORM_TOPIC,
+                topic=spec.title,
                 domain=domain,
                 kind=kind,
                 is_builtin=True,
@@ -182,9 +290,8 @@ def seed_platform_deck(session: Session) -> dict[str, int]:
         else:
             existing_count += 1
             desired = {
-                "deck_id": deck.id,
                 "definition": answer,
-                "topic": PLATFORM_TOPIC,
+                "topic": spec.title,
                 "domain": domain,
                 "kind": kind,
                 "is_builtin": True,
@@ -205,10 +312,11 @@ def seed_platform_deck(session: Session) -> dict[str, int]:
 
     session.commit()
     return {
-        "deck_id": int(deck.id or 0),
-        "deck_size": len(PLATFORM_ENGINEERING_DECK),
-        "concept_cards": len(PLATFORM_ENGINEERING_CONCEPT_DECK),
-        "lab_cards": len(PLATFORM_ENGINEERING_LAB_DECK),
+        "slug": spec.slug,
+        "deck_id": deck_id,
+        "deck_size": len(rows),
+        "concept_cards": concept_cards,
+        "lab_cards": lab_cards,
         "inserted_cards": inserted_cards,
         "existing_cards": existing_count,
         "updated_cards": updated_cards,
@@ -216,20 +324,33 @@ def seed_platform_deck(session: Session) -> dict[str, int]:
     }
 
 
-def run() -> None:
-    """Seed the configured database and print a compact result summary."""
-    with Session(engine) as session:
-        result = seed_platform_deck(session)
+def seed_platform_deck(session: Session) -> dict[str, int | str]:
+    """Backwards-compatible helper for the Platform Engineering seed tests."""
+    return seed_curriculum(session, PLATFORM_ENGINEERING_SPEC)
 
+
+def seed_all_curricula(session: Session) -> list[dict[str, int | str]]:
+    """Seed every registered Official curriculum."""
+    return [seed_curriculum(session, spec) for spec in OFFICIAL_CURRICULA]
+
+
+def run() -> None:
+    """Seed the configured database and print one compact summary per deck."""
+    with Session(engine) as session:
+        results = seed_all_curricula(session)
+
+    total_cards = sum(int(result["deck_size"]) for result in results)
     print(
-        "FlashQuest featured Platform Engineering deck ready: "
-        f"{result['deck_size']} cards "
-        f"({result['concept_cards']} concepts + {result['lab_cards']} labs; "
-        f"{result['inserted_cards']} inserted, "
-        f"{result['updated_cards']} metadata repaired, "
-        f"{result['existing_cards']} already present, "
-        f"{result['created_progress']} demo progress rows created)."
+        f"FlashQuest Official Library ready: {len(results)} decks, "
+        f"{total_cards} registered cards."
     )
+    for result in results:
+        print(
+            f"- {result['slug']}: {result['deck_size']} cards "
+            f"({result['inserted_cards']} inserted, "
+            f"{result['updated_cards']} repaired, "
+            f"{result['existing_cards']} already present)."
+        )
 
 
 if __name__ == "__main__":

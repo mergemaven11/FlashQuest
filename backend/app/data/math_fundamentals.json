@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "name": "Math Fundamentals",
+  "card_count": 30,
+  "domains": [
+    {
+      "name": "Number Sense",
+      "cards": [
+        {"prompt": "Math · What is place value?", "answer": "Place value is the value a digit represents because of its position in a numeral, such as tens, hundreds, tenths, or hundredths."},
+        {"prompt": "Math · What is the order of operations?", "answer": "Evaluate grouping symbols first, then exponents, then multiplication and division from left to right, then addition and subtraction from left to right."},
+        {"prompt": "Math · What is an integer?", "answer": "An integer is a whole number or its negative, including zero, such as -4, 0, and 12."},
+        {"prompt": "Math · What is an absolute value?", "answer": "Absolute value is a number's distance from zero on the number line, so it is never negative."},
+        {"prompt": "Math · What is a prime number?", "answer": "A prime number is a whole number greater than 1 with exactly two positive factors: 1 and itself."},
+        {"prompt": "Math · What is the greatest common factor?", "answer": "The greatest common factor is the largest positive whole number that divides each of two or more numbers without a remainder."}
+      ]
+    },
+    {
+      "name": "Fractions, Ratios & Percent",
+      "cards": [
+        {"prompt": "Math · What does the denominator of a fraction represent?", "answer": "The denominator tells how many equal parts make one whole; the numerator tells how many of those parts are being considered."},
+        {"prompt": "Math · How do you add fractions with different denominators?", "answer": "Rewrite them with a common denominator, add the numerators, keep the common denominator, and simplify if possible."},
+        {"prompt": "Math · How do you multiply two fractions?", "answer": "Multiply the numerators together and the denominators together, then simplify the resulting fraction."},
+        {"prompt": "Math · What is a ratio?", "answer": "A ratio compares two quantities by division, such as 3:4, 3/4, or '3 to 4'."},
+        {"prompt": "Math · What does 25% mean?", "answer": "It means 25 per 100, which is equivalent to 25/100, 1/4, or 0.25."},
+        {"prompt": "Math · How do you find a percentage of a number?", "answer": "Convert the percentage to a decimal or fraction and multiply it by the number; for example, 20% of 50 is 0.20 × 50 = 10."}
+      ]
+    },
+    {
+      "name": "Algebra",
+      "cards": [
+        {"prompt": "Math · What is a variable?", "answer": "A variable is a symbol, often a letter, used to represent an unknown or changeable value."},
+        {"prompt": "Math · What is an equation?", "answer": "An equation states that two expressions have equal value, using an equals sign between them."},
+        {"prompt": "Math · What does it mean to solve an equation?", "answer": "It means finding the value or values of the variable that make the equation true."},
+        {"prompt": "Math · Why can you perform the same operation on both sides of an equation?", "answer": "Doing the same valid operation to both sides preserves equality, which lets you isolate the unknown without changing the equation's solutions."},
+        {"prompt": "Math · What is the distributive property?", "answer": "It says multiplying a sum by a factor is equivalent to multiplying each term by that factor: a(b + c) = ab + ac."},
+        {"prompt": "Math · What is slope in a linear relationship?", "answer": "Slope is the rate of change: the change in y divided by the change in x, often written as rise over run."}
+      ]
+    },
+    {
+      "name": "Geometry & Measurement",
+      "cards": [
+        {"prompt": "Math · What is perimeter?", "answer": "Perimeter is the total distance around a two-dimensional shape, found by adding the lengths of its sides."},
+        {"prompt": "Math · What is the area of a rectangle?", "answer": "Area equals length times width and is measured in square units."},
+        {"prompt": "Math · What is the area of a triangle?", "answer": "Area equals one-half times the base times the perpendicular height: A = 1/2 bh."},
+        {"prompt": "Math · What is the circumference of a circle?", "answer": "Circumference is the distance around a circle and equals 2πr or πd."},
+        {"prompt": "Math · What is the Pythagorean theorem?", "answer": "For a right triangle, the square of the hypotenuse equals the sum of the squares of the two legs: a² + b² = c²."},
+        {"prompt": "Math · Why must units be considered when comparing measurements?", "answer": "Values expressed in different units are not directly comparable until they are converted to compatible units."}
+      ]
+    },
+    {
+      "name": "Data & Probability",
+      "cards": [
+        {"prompt": "Math · What is the mean of a set of numbers?", "answer": "The mean is the sum of the values divided by the number of values."},
+        {"prompt": "Math · What is the median?", "answer": "The median is the middle value after the data are ordered; with an even number of values, it is the mean of the two middle values."},
+        {"prompt": "Math · What is the mode?", "answer": "The mode is the value or values that occur most often in a data set."},
+        {"prompt": "Math · What is range in a data set?", "answer": "Range is the maximum value minus the minimum value."},
+        {"prompt": "Math · What does probability measure?", "answer": "Probability measures how likely an event is, usually on a scale from 0 for impossible to 1 for certain."},
+        {"prompt": "Math · For equally likely outcomes, how do you calculate the probability of an event?", "answer": "Divide the number of favorable outcomes by the total number of possible equally likely outcomes."}
+      ]
+    }
+  ]
+}

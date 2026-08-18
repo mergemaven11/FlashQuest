@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "name": "Docker Fundamentals",
+  "card_count": 30,
+  "domains": [
+    {
+      "name": "Containers & Images",
+      "cards": [
+        {"prompt": "Docker · What is a container?", "answer": "A container is an isolated process environment created from an image, sharing the host kernel while packaging the application and its runtime dependencies."},
+        {"prompt": "Docker · What is an image?", "answer": "An image is an immutable, layered filesystem template plus metadata used to create containers."},
+        {"prompt": "Docker · How is a container different from a virtual machine?", "answer": "Containers share the host kernel and isolate processes; virtual machines emulate hardware and run a separate guest operating system kernel."},
+        {"prompt": "Docker · What does `docker run` do at a high level?", "answer": "It creates a container from an image, applies runtime configuration, and starts the container's configured process."},
+        {"prompt": "Docker · What does `docker ps` show?", "answer": "By default it lists running containers; `docker ps -a` also includes stopped containers."},
+        {"prompt": "Docker · Why are image layers useful?", "answer": "Layers can be cached and shared across images, reducing rebuild time, storage use, and data transfer when unchanged layers are reused."}
+      ]
+    },
+    {
+      "name": "Dockerfiles & Builds",
+      "cards": [
+        {"prompt": "Docker · What is a Dockerfile?", "answer": "A Dockerfile is a text recipe of instructions used by a container builder to assemble an image."},
+        {"prompt": "Docker · What is the difference between `COPY` and `RUN` in a Dockerfile?", "answer": "`COPY` adds files from the build context into the image; `RUN` executes a command during the image build and commits its filesystem changes to a layer."},
+        {"prompt": "Docker · Why should frequently changing Dockerfile steps usually appear later?", "answer": "Docker can reuse cached earlier layers, so keeping stable steps first avoids invalidating expensive work when frequently changing files change."},
+        {"prompt": "Docker · What is the build context?", "answer": "The build context is the set of files sent or made available to the image builder for instructions such as `COPY`."},
+        {"prompt": "Docker · What does `.dockerignore` do?", "answer": "It excludes matching files and directories from the build context, which can reduce transfer size and prevent unnecessary or sensitive files from entering a build."},
+        {"prompt": "Docker · What is a multi-stage build?", "answer": "A multi-stage build uses multiple `FROM` stages so build tools and intermediate artifacts can stay out of the final runtime image."}
+      ]
+    },
+    {
+      "name": "Storage & Data",
+      "cards": [
+        {"prompt": "Docker · Why should important application data usually live outside a container's writable layer?", "answer": "A container can be replaced or removed, so persistent data should use a volume, bind mount, or external data service when it must survive container lifecycle changes."},
+        {"prompt": "Docker · What is a Docker volume?", "answer": "A volume is Docker-managed persistent storage that can be mounted into one or more containers independently of a container's writable layer."},
+        {"prompt": "Docker · What is a bind mount?", "answer": "A bind mount maps a specific host filesystem path into a container, exposing that host content directly at the chosen container path."},
+        {"prompt": "Docker · When is a bind mount especially useful during development?", "answer": "It is useful when source files on the host should appear immediately inside the container without rebuilding the image after every edit."},
+        {"prompt": "Docker · What happens to a named volume when its container is removed?", "answer": "The volume normally remains until it is removed separately, allowing its data to outlive the container."},
+        {"prompt": "Docker · Why should secrets not be baked into image layers?", "answer": "Image layers can persist in history and registries, so baked-in secrets can remain recoverable even after later Dockerfile steps appear to delete them."}
+      ]
+    },
+    {
+      "name": "Networking",
+      "cards": [
+        {"prompt": "Docker · What does publishing a container port do?", "answer": "It maps a host address and port to a container port so traffic reaching the host can be forwarded to the containerized service."},
+        {"prompt": "Docker · Why can two containers on the same user-defined bridge network usually use container names to reach each other?", "answer": "Docker provides DNS-based service discovery on user-defined networks, resolving container or service names to network addresses."},
+        {"prompt": "Docker · What is the difference between `EXPOSE` and publishing a port?", "answer": "`EXPOSE` documents an intended container port in image metadata; publishing with `-p` or equivalent actually makes a host-to-container port mapping."},
+        {"prompt": "Docker · Why does `localhost` inside a container not normally mean the host machine?", "answer": "The container has its own network namespace, so `localhost` refers to that container's loopback interface unless special host networking is used."},
+        {"prompt": "Docker · What is a Docker bridge network?", "answer": "It is a software network on the host that connects containers and can provide isolation, address assignment, and routing between containers and the host."},
+        {"prompt": "Docker · What should you check first if a web container is running but unreachable from the host?", "answer": "Confirm the app is listening on the expected interface and container port, then verify the host port mapping and any host firewall rules."}
+      ]
+    },
+    {
+      "name": "Compose & Operations",
+      "cards": [
+        {"prompt": "Docker · What problem does Docker Compose solve?", "answer": "Compose describes and operates a multi-container application as one project, including services, networks, volumes, environment settings, and dependencies."},
+        {"prompt": "Docker · What is a service in a Compose file?", "answer": "A service is a declarative definition of one application component, including its image or build, command, environment, networks, volumes, and runtime settings."},
+        {"prompt": "Docker · What does `docker compose up` do?", "answer": "It creates or reconciles the project's declared networks, volumes, and containers, then starts the services."},
+        {"prompt": "Docker · What does `docker logs` help you inspect?", "answer": "It shows a container's captured standard output and standard error, which is often the fastest first place to inspect an application failure."},
+        {"prompt": "Docker · What does a container health check represent?", "answer": "It is a recurring command or probe that reports whether the containerized application is functioning according to a defined health condition, not merely whether its process exists."},
+        {"prompt": "Docker · Why is pinning an image tag or digest useful in repeatable deployments?", "answer": "It reduces surprise by making the selected image version explicit instead of allowing a mutable tag such as `latest` to point to different content later."}
+      ]
+    }
+  ]
+}

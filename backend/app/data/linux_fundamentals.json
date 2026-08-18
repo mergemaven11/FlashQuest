@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "name": "Linux Fundamentals",
+  "card_count": 30,
+  "domains": [
+    {
+      "name": "Filesystem & Permissions",
+      "cards": [
+        {"prompt": "Linux · What does the root directory `/` represent?", "answer": "It is the top of the Linux filesystem hierarchy; all filesystems, directories, devices, and mounted storage appear somewhere beneath it."},
+        {"prompt": "Linux · What is the difference between an absolute path and a relative path?", "answer": "An absolute path begins from `/`; a relative path is interpreted from the current working directory."},
+        {"prompt": "Linux · What do the read, write, and execute permission bits mean for a regular file?", "answer": "Read allows viewing content, write allows modifying content, and execute allows the file to be run as a program when its format is executable."},
+        {"prompt": "Linux · What does `chmod` change?", "answer": "It changes file or directory permission bits, either with symbolic notation such as `u+x` or numeric modes such as `755`."},
+        {"prompt": "Linux · What does `chown` change?", "answer": "It changes the user owner and, optionally, the group owner of a filesystem object."},
+        {"prompt": "Linux · What is the purpose of `/etc`?", "answer": "It conventionally contains system-wide configuration files and configuration directories for the operating system and installed services."}
+      ]
+    },
+    {
+      "name": "Processes & Services",
+      "cards": [
+        {"prompt": "Linux · What is a process?", "answer": "A process is a running instance of a program with its own process ID, execution state, memory mappings, open resources, and security context."},
+        {"prompt": "Linux · What is a PID?", "answer": "A PID is the numeric process identifier the kernel assigns to a running process."},
+        {"prompt": "Linux · What does `ps` help you inspect?", "answer": "It reports process information such as PIDs, owners, commands, CPU state, and other attributes depending on the selected options."},
+        {"prompt": "Linux · What is a signal?", "answer": "A signal is an asynchronous notification sent to a process to request or report an event, such as terminate, interrupt, stop, or reload behavior."},
+        {"prompt": "Linux · What does `systemctl` manage on a systemd-based machine?", "answer": "It manages systemd units, including starting, stopping, restarting, enabling, disabling, and inspecting services and other unit types."},
+        {"prompt": "Linux · What is the difference between enabling and starting a systemd service?", "answer": "Starting runs the service now; enabling configures it to start automatically when its target or dependency conditions are reached in future boots."}
+      ]
+    },
+    {
+      "name": "Shell & Text Tools",
+      "cards": [
+        {"prompt": "Linux · What does a shell do?", "answer": "A shell interprets commands, starts programs, expands variables and paths, supports scripting, and connects programs through features such as pipes and redirection."},
+        {"prompt": "Linux · What does a pipe `|` do in the shell?", "answer": "It connects one command's standard output to the next command's standard input so programs can be composed into a processing pipeline."},
+        {"prompt": "Linux · What is standard output?", "answer": "Standard output, or stdout, is the conventional output stream a process uses for normal results; it is file descriptor 1 by default."},
+        {"prompt": "Linux · What does `grep` do?", "answer": "It searches input for lines matching a text pattern or regular expression and prints the matching lines by default."},
+        {"prompt": "Linux · What does `less` help you do?", "answer": "It lets you page through text interactively without loading the entire file into an editor, with navigation and search controls."},
+        {"prompt": "Linux · Why use shell variables and environment variables?", "answer": "They store values for commands and scripts; exported environment variables are also inherited by child processes and commonly carry runtime configuration."}
+      ]
+    },
+    {
+      "name": "Networking & Packages",
+      "cards": [
+        {"prompt": "Linux · What does an IP address identify?", "answer": "It identifies a network interface at the Internet Protocol layer so packets can be addressed and routed to or from that interface."},
+        {"prompt": "Linux · What does `ip addr` show?", "answer": "It shows network interfaces and their assigned addresses, interface state, and related addressing information."},
+        {"prompt": "Linux · What is a listening socket?", "answer": "It is a socket bound to an address and port that waits for incoming connection requests from clients."},
+        {"prompt": "Linux · What can `ss -lnt` help diagnose?", "answer": "It lists listening TCP sockets numerically, helping confirm whether a service is actually listening and on which local addresses and ports."},
+        {"prompt": "Linux · What is a package manager?", "answer": "It installs, upgrades, verifies, and removes software packages while tracking package metadata and dependencies for a distribution."},
+        {"prompt": "Linux · Why should package indexes often be refreshed before installing software?", "answer": "The local package metadata may be stale; refreshing it lets the package manager resolve against the repositories' current package information."}
+      ]
+    },
+    {
+      "name": "Troubleshooting & Resources",
+      "cards": [
+        {"prompt": "Linux · What does `df` report?", "answer": "It reports filesystem space usage, including total, used, and available capacity for mounted filesystems."},
+        {"prompt": "Linux · What does `du` report?", "answer": "It estimates filesystem space consumed by specified files and directory trees, making it useful for finding where disk space is being used."},
+        {"prompt": "Linux · What does `free` help you inspect?", "answer": "It summarizes physical memory and swap usage, including available memory that can be used without immediately swapping."},
+        {"prompt": "Linux · Why can high load average exist even when CPU usage is not near 100%?", "answer": "Linux load can include tasks waiting in uninterruptible I/O states, so storage or other I/O stalls can raise load without saturating CPU execution."},
+        {"prompt": "Linux · What does `journalctl -u SERVICE` help you inspect?", "answer": "It filters the systemd journal to log records associated with a particular systemd unit, often a service."},
+        {"prompt": "Linux · What is a useful first troubleshooting pattern when a service will not start?", "answer": "Check the service status and recent logs, verify configuration and dependencies, then confirm required files, permissions, ports, and resources are available."}
+      ]
+    }
+  ]
+}

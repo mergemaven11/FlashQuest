@@ -42,7 +42,7 @@ def _allowed_origins() -> list[str]:
 
 
 app = FastAPI(
-    title="FlashQuest’s API",
+    title="FlashQuest API",
     version=settings.APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
