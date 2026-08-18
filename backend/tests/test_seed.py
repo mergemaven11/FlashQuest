@@ -41,7 +41,7 @@ def test_lab_cards_are_scenario_driven():
     )
 
 
-def test_seed_platform_deck_is_idempotent(sqlite_session):
+def test_seed_platform_deck_is_idempotent_and_protected(sqlite_session):
     first = seed_platform_deck(sqlite_session)
     assert first["deck_size"] == 216
     assert first["concept_cards"] == 144
@@ -49,12 +49,19 @@ def test_seed_platform_deck_is_idempotent(sqlite_session):
     assert first["inserted_cards"] == 216
     assert first["created_progress"] == 216
 
-    assert len(sqlite_session.exec(select(Card)).all()) == 216
+    cards = sqlite_session.exec(select(Card)).all()
+    assert len(cards) == 216
     assert len(sqlite_session.exec(select(UserCard)).all()) == 216
+    assert all(card.topic == "Platform Engineering" for card in cards)
+    assert all(card.is_builtin for card in cards)
+    assert sum(card.kind == "concept" for card in cards) == 144
+    assert sum(card.kind == "lab" for card in cards) == 72
+    assert len({card.domain for card in cards}) >= 12
 
     second = seed_platform_deck(sqlite_session)
     assert second["inserted_cards"] == 0
     assert second["existing_cards"] == 216
+    assert second["updated_cards"] == 0
     assert second["created_progress"] == 0
 
     assert len(sqlite_session.exec(select(Card)).all()) == 216
