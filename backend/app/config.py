@@ -13,9 +13,7 @@ class Settings(BaseSettings):
     # Accept JSON-looking or comma-separated text; main.py normalizes it.
     ALLOWED_ORIGINS: str = ""
 
-    # Authentication. Override JWT_SECRET in every hosted environment.
-    JWT_SECRET: str = "dev-only-change-me"
-    JWT_ALGORITHM: str = "HS256"
+    # Opaque bearer sessions are stored only as hashes in PostgreSQL.
     ACCESS_TOKEN_MINUTES: int = 60 * 24 * 7
 
     # Email verification. `console` prints the verification URL locally/tests.
