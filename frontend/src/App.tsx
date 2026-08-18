@@ -1,5 +1,6 @@
-import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
+import { GameFeelProvider, SoundToggle } from "./gameFeel";
 import Admin from "./pages/Admin";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -13,6 +14,7 @@ const DOCS_URL = "https://flashquest-docs.netlify.app/";
 
 function Shell() {
   const { user, signOut } = useAuth();
+  const location = useLocation();
   const navItems = [
     { to: "/study", icon: "⚡", label: "Play" },
     { to: "/deck-lab", icon: "🧪", label: "Deck Lab" },
@@ -42,6 +44,7 @@ function Shell() {
                 </NavLink>
               ))}
             </nav>
+            <SoundToggle />
             <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button flex items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08]">📖 Docs</a>
             {user ? (
               <div className="flex items-center gap-2">
@@ -55,7 +58,7 @@ function Shell() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <main key={location.pathname} className="game-page-enter relative z-10 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/study" element={<Study />} />
@@ -79,5 +82,13 @@ function Shell() {
 }
 
 export default function App() {
-  return <BrowserRouter><AuthProvider><Shell /></AuthProvider></BrowserRouter>;
+  return (
+    <GameFeelProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <Shell />
+        </AuthProvider>
+      </BrowserRouter>
+    </GameFeelProvider>
+  );
 }
