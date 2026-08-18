@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from "./auth";
 import { GameFeelProvider, SoundToggle } from "./gameFeel";
 import Admin from "./pages/Admin";
 import Landing from "./pages/Landing";
+import Library from "./pages/Library";
+import LibraryDeck from "./pages/LibraryDeck";
 import Login from "./pages/Login";
 import MyDecks from "./pages/MyDecks";
 import Signup from "./pages/Signup";
@@ -17,6 +19,7 @@ function Shell() {
   const location = useLocation();
   const navItems = [
     { to: "/study", icon: "⚡", label: "Play" },
+    { to: "/library", icon: "📚", label: "Library" },
     { to: "/deck-lab", icon: "🧪", label: "Deck Lab" },
     ...(user ? [{ to: "/decks", icon: "🗂️", label: "My Decks" }] : []),
     { to: "/status", icon: "🗺️", label: "Deck Map" },
@@ -31,7 +34,7 @@ function Shell() {
           <NavLink to="/" className="group flex items-center gap-3">
             <div className="grid h-11 w-11 place-items-center rounded-2xl border border-[#faa307]/25 bg-[#6a040f]/55 text-2xl shadow-lg shadow-black/30 transition group-hover:-rotate-6 group-hover:scale-105">🧠</div>
             <div>
-              <div className="flex items-center gap-2"><span className="text-lg font-black tracking-tight text-white">FlashQuest’s</span><span className="rounded-full border border-[#ffba08]/25 bg-[#ffba08]/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#ffba08]">Quest Mode</span></div>
+              <div className="flex items-center gap-2"><span className="text-lg font-black tracking-tight text-white">FlashQuest</span><span className="rounded-full border border-[#ffba08]/25 bg-[#ffba08]/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#ffba08]">Quest Mode</span></div>
               <p className="text-xs font-medium text-slate-400">Any topic. One memory engine.</p>
             </div>
           </NavLink>
@@ -62,6 +65,8 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/study" element={<Study />} />
+          <Route path="/library" element={<Library />} />
+          <Route path="/library/:slug" element={<LibraryDeck />} />
           <Route path="/deck-lab" element={<Admin />} />
           <Route path="/admin" element={<Navigate to="/deck-lab" replace />} />
           <Route path="/decks" element={<MyDecks />} />
@@ -74,7 +79,7 @@ function Shell() {
       </main>
 
       <footer className="relative z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500">
-        <span>Featured Platform Engineering · make your own decks · 12 mastery levels</span>
+        <span>Library · community decks · Platform Engineering · 12 mastery levels</span>
         <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">FastAPI · React · PostgreSQL · Docker · Docs ↗</a>
       </footer>
     </div>
