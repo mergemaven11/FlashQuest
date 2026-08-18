@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { copyFeaturedDeck, getSharedDeck } from "../api";
+import { copyDeck, getSharedDeck } from "../api";
 import { useAuth } from "../auth";
 import type { DeckRead } from "../types";
 
@@ -41,15 +41,15 @@ export default function LibraryDeck() {
     };
   }, [slug]);
 
-  async function saveOfficialCopy() {
-    if (!deck || !user || saving || !deck.is_official) return;
+  async function saveCopy() {
+    if (!deck || !user?.is_verified || saving) return;
     setSaving(true);
     setError(null);
     try {
-      const copy = await copyFeaturedDeck(deck.id);
-      navigate(`/study?deck=${copy.id}`);
+      const copy = await copyDeck(deck.id);
+      navigate(`/deck-lab?deck=${copy.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save this deck");
+      setError(e instanceof Error ? e.message : "Could not remix this deck");
     } finally {
       setSaving(false);
     }
@@ -137,24 +137,22 @@ export default function LibraryDeck() {
                 ⚡ Start studying
               </Link>
 
-              {deck.is_official && user?.is_verified ? (
+              {user?.is_verified ? (
                 <button
                   type="button"
-                  onClick={() => void saveOfficialCopy()}
+                  onClick={() => void saveCopy()}
                   disabled={saving}
                   className="game-button border border-cyan-300/25 bg-cyan-300/[0.08] px-6 py-3 font-black text-cyan-100"
                   data-game-sound="save"
                 >
-                  {saving ? "Saving…" : "📥 Save my own copy"}
+                  {saving ? "Creating remix…" : deck.is_official ? "📥 Save my own copy" : "🧬 Remix to my decks"}
                 </button>
-              ) : deck.is_official && !user ? (
+              ) : !user ? (
                 <Link className="game-button border border-white/10 bg-white/[0.04] px-6 py-3 font-black text-white" to="/login">
                   Sign in to save a copy
                 </Link>
-              ) : deck.is_official && user && !user.is_verified ? (
-                <span className="game-chip px-4 py-3 text-sm font-bold text-slate-300">Verify your email to save copies</span>
               ) : (
-                <span className="game-chip px-4 py-3 text-sm font-bold text-slate-400">🧬 Community remix controls are next</span>
+                <span className="game-chip px-4 py-3 text-sm font-bold text-slate-300">Verify your email to save or remix decks</span>
               )}
             </div>
           </div>
@@ -176,6 +174,12 @@ export default function LibraryDeck() {
               <p className="metric-label">Study access</p>
               <p className="mt-1 text-sm font-bold text-slate-300">{deck.visibility === "unlisted" ? "Anyone with this link" : "Public Library"}</p>
             </div>
+            {deck.source_deck_id && (
+              <div className="border-t border-white/10 pt-4">
+                <p className="metric-label">Lineage</p>
+                <p className="mt-1 text-sm font-bold text-slate-300">🧬 Remix of deck #{deck.source_deck_id}</p>
+              </div>
+            )}
           </aside>
         </div>
       </section>
