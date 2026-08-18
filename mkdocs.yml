@@ -64,7 +64,7 @@ extra_css:
 
 nav:
   - Home: index.md
-  - Open FlashQuest’s: https://flashcards-tobias.netlify.app/
+  - Open FlashQuest’s: https://flaskquest.netlify.app/
   - Product:
       - Make Your Own Deck: MAKE_YOUR_OWN_DECK.md
       - Accounts & Email Verification: AUTHENTICATION.md
