@@ -15,7 +15,7 @@ from sqlmodel import Session
 
 from .config import settings
 from .db import get_session
-from .routers import cards, study
+from .routers import auth, cards, decks, study
 
 
 def _allowed_origins() -> list[str]:
@@ -69,6 +69,8 @@ async def request_context(request: Request, call_next):
     return response
 
 
+app.include_router(auth.router)
+app.include_router(decks.router)
 app.include_router(cards.router)
 app.include_router(study.router)
 
