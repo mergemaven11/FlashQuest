@@ -1,11 +1,12 @@
-# app/routers/cards.py
+"""Card CRUD, demo protection, and scoped card-management endpoints."""
+
 from __future__ import annotations
 
 from hmac import compare_digest
 from typing import Any, Dict, List, Optional, cast
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import asc, desc, func, or_, update
+from sqlalchemy import and_, desc, func, or_, update
 from sqlmodel import Session, delete, select
 
 from app.config import settings
@@ -17,32 +18,33 @@ from app.models import (
     CardRead,
     CardStats,
     CardUpdate,
+    Deck,
     Review,
+    User,
     UserCard,
 )
+from app.security import DEMO_USER_ID, get_optional_user, require_verified_user
 
 router = APIRouter()
-DEFAULT_USER_ID = 1
 VALID_KINDS = {"concept", "lab"}
 
 
-def _clean_card_fields(data: dict[str, Any]) -> dict[str, Any]:
-    """Normalize user-provided reusable deck metadata."""
-    for field in ("word", "definition", "topic", "domain", "kind"):
-        if field in data and isinstance(data[field], str):
-            data[field] = data[field].strip()
-    data["topic"] = data.get("topic") or "Custom"
-    data["domain"] = data.get("domain") or "General"
-    data["kind"] = (data.get("kind") or "concept").lower()
-    if data["kind"] not in VALID_KINDS:
+def _clean_text(value: str, field: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        raise HTTPException(status_code=422, detail=f"{field} is required")
+    return cleaned
+
+
+def _clean_kind(value: str) -> str:
+    kind = value.strip().lower() or "concept"
+    if kind not in VALID_KINDS:
         raise HTTPException(status_code=422, detail="kind must be 'concept' or 'lab'")
-    if not data.get("word") or not data.get("definition"):
-        raise HTTPException(status_code=422, detail="question and answer are required")
-    return data
+    return kind
 
 
 def _require_demo_password(password: str | None) -> None:
-    """Require the server-side demo password for global/built-in destructive actions."""
+    """Require the server-side demo password for built-in destructive actions."""
     expected = settings.DEMO_DELETE_PASSWORD
     if not expected:
         raise HTTPException(
@@ -53,67 +55,106 @@ def _require_demo_password(password: str | None) -> None:
         raise HTTPException(status_code=403, detail="Incorrect demo admin password")
 
 
-@router.post("/cards", response_model=CardRead)
+def _owned_deck(session: Session, deck_id: int, user: User) -> Deck:
+    deck = session.get(Deck, deck_id)
+    if deck is None:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    if deck.is_builtin or deck.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="You can only change your own decks")
+    return deck
+
+
+def _owned_card(session: Session, card_id: int, user: User) -> tuple[Card, Deck]:
+    card = session.get(Card, card_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    if card.is_builtin:
+        raise HTTPException(
+            status_code=403,
+            detail="Built-in cards are read-only. Copy the featured deck to customize it.",
+        )
+    if card.deck_id is None:
+        raise HTTPException(status_code=403, detail="Legacy card is not attached to your deck")
+    return card, _owned_deck(session, card.deck_id, user)
+
+
+@router.post("/cards", response_model=CardRead, status_code=201)
 def create_card(
-    payload: CardCreate, session: Session = Depends(get_session)
+    payload: CardCreate,
+    user: User = Depends(require_verified_user),
+    session: Session = Depends(get_session),
 ) -> CardRead:
-    """Create a user-owned card in any topic/domain and initialize progress."""
-    data = _clean_card_fields(payload.model_dump())
-    card = Card(**data, is_builtin=False)
+    """Create a card in a deck owned by the verified user."""
+    deck = _owned_deck(session, payload.deck_id, user)
+    card = Card(
+        deck_id=deck.id,
+        word=_clean_text(payload.word, "question"),
+        definition=_clean_text(payload.definition, "answer"),
+        topic=deck.title,
+        domain=payload.domain.strip() or "General",
+        kind=_clean_kind(payload.kind),
+        is_builtin=False,
+    )
     session.add(card)
+    session.flush()
+    session.add(UserCard(user_id=user.id, card_id=int(card.id or 0), bin=0))
     session.commit()
     session.refresh(card)
-
-    session.add(UserCard(user_id=DEFAULT_USER_ID, card_id=card.id))
-    session.commit()
     return card
 
 
 @router.get("/cards", response_model=List[CardRead])
-def list_cards(session: Session = Depends(get_session)) -> List[CardRead]:
-    """Return every card in stable ID order."""
-    rows = session.exec(select(Card).order_by(asc(cast(Any, Card.id)))).all()
+def list_cards(
+    deck_id: int | None = Query(None),
+    user: User | None = Depends(get_optional_user),
+    session: Session = Depends(get_session),
+) -> List[CardRead]:
+    """List public built-ins plus cards owned by the signed-in user."""
+    stmt = select(Card).outerjoin(Deck, Card.deck_id == Deck.id)
+    if user is None:
+        stmt = stmt.where(Card.is_builtin == True)  # noqa: E712
+    else:
+        stmt = stmt.where(
+            or_(Card.is_builtin == True, Deck.owner_id == user.id)  # noqa: E712
+        )
+    if deck_id is not None:
+        stmt = stmt.where(Card.deck_id == deck_id)
+    rows = session.exec(stmt.order_by(cast(Any, Card.id))).all()
     return list(rows)
 
 
 @router.put("/cards/{card_id}", response_model=CardRead)
 def replace_card(
-    card_id: int, payload: CardUpdate, session: Session = Depends(get_session)
+    card_id: int,
+    payload: CardUpdate,
+    user: User = Depends(require_verified_user),
+    session: Session = Depends(get_session),
 ) -> CardRead:
-    """Update the editable fields of a custom card."""
-    return _update_card(card_id, payload, session)
+    return _update_card(card_id, payload, user, session)
 
 
 @router.patch("/cards/{card_id}", response_model=CardRead)
 def update_card(
-    card_id: int, payload: CardUpdate, session: Session = Depends(get_session)
+    card_id: int,
+    payload: CardUpdate,
+    user: User = Depends(require_verified_user),
+    session: Session = Depends(get_session),
 ) -> CardRead:
-    """Partially update a custom card."""
-    return _update_card(card_id, payload, session)
+    return _update_card(card_id, payload, user, session)
 
 
-def _update_card(card_id: int, payload: CardUpdate, session: Session) -> CardRead:
-    card = session.get(Card, card_id)
-    if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
-    if card.is_builtin:
-        raise HTTPException(
-            status_code=403,
-            detail="Built-in demo cards are read-only; make a custom copy to edit them",
-        )
-
+def _update_card(card_id: int, payload: CardUpdate, user: User, session: Session) -> CardRead:
+    card, deck = _owned_card(session, card_id, user)
     data = payload.model_dump(exclude_unset=True)
-    merged = {
-        "word": data.get("word", card.word),
-        "definition": data.get("definition", card.definition),
-        "topic": data.get("topic", card.topic),
-        "domain": data.get("domain", card.domain),
-        "kind": data.get("kind", card.kind),
-    }
-    cleaned = _clean_card_fields(merged)
-    for field, value in cleaned.items():
-        setattr(card, field, value)
-
+    if "word" in data and data["word"] is not None:
+        card.word = _clean_text(data["word"], "question")
+    if "definition" in data and data["definition"] is not None:
+        card.definition = _clean_text(data["definition"], "answer")
+    if "domain" in data and data["domain"] is not None:
+        card.domain = data["domain"].strip() or "General"
+    if "kind" in data and data["kind"] is not None:
+        card.kind = _clean_kind(data["kind"])
+    card.topic = deck.title
     session.add(card)
     session.commit()
     session.refresh(card)
@@ -123,28 +164,24 @@ def _update_card(card_id: int, payload: CardUpdate, session: Session) -> CardRea
 @router.delete("/cards/{card_id}")
 def delete_card(
     card_id: int,
+    user: User | None = Depends(get_optional_user),
     session: Session = Depends(get_session),
     demo_password: str | None = Header(None, alias="X-Demo-Admin-Password"),
 ) -> Dict[str, bool]:
-    """Delete a card; built-in demo cards require the server-side admin password."""
+    """Delete an owned card; built-in cards require the server-side admin password."""
     card = session.get(Card, card_id)
-    if not card:
+    if card is None:
         raise HTTPException(status_code=404, detail="Card not found")
+
     if card.is_builtin:
         _require_demo_password(demo_password)
+    else:
+        if user is None:
+            raise HTTPException(status_code=401, detail="Sign in required")
+        _owned_card(session, card_id, user)
 
-    session.exec(
-        delete(Review).where(
-            Review.card_id == card_id,
-            Review.user_id == DEFAULT_USER_ID,
-        )
-    )
-    session.exec(
-        delete(UserCard).where(
-            UserCard.card_id == card_id,
-            UserCard.user_id == DEFAULT_USER_ID,
-        )
-    )
+    session.exec(delete(Review).where(Review.card_id == card_id))
+    session.exec(delete(UserCard).where(UserCard.card_id == card_id))
     session.delete(card)
     session.commit()
     return {"ok": True}
@@ -152,18 +189,31 @@ def delete_card(
 
 @router.get("/cards/admin", response_model=List[CardAdminRead])
 def list_cards_admin(
-    q: Optional[str] = Query(
-        None, description="Case-insensitive search over card content and metadata"
-    ),
+    q: Optional[str] = Query(None),
+    deck_id: int | None = Query(None),
+    user: User | None = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ) -> List[CardAdminRead]:
-    """Return cards with reusable deck metadata and per-user study state."""
+    """Return manageable cards with current-user/demo study state."""
+    user_id = int(user.id or 0) if user is not None else DEMO_USER_ID
+    uc_card_id = cast(Any, UserCard.card_id)
+    card_id = cast(Any, Card.id)
     stmt = (
         select(Card, UserCard)
-        .join(UserCard, cast(Any, UserCard.card_id) == cast(Any, Card.id))
-        .where(UserCard.user_id == DEFAULT_USER_ID)
+        .outerjoin(
+            UserCard,
+            and_(uc_card_id == card_id, UserCard.user_id == user_id),
+        )
+        .outerjoin(Deck, Card.deck_id == Deck.id)
     )
-
+    if user is None:
+        stmt = stmt.where(Card.is_builtin == True)  # noqa: E712
+    else:
+        stmt = stmt.where(
+            or_(Card.is_builtin == True, Deck.owner_id == user.id)  # noqa: E712
+        )
+    if deck_id is not None:
+        stmt = stmt.where(Card.deck_id == deck_id)
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(
@@ -176,12 +226,11 @@ def list_cards_admin(
             )
         )
 
-    stmt = stmt.order_by(desc(cast(Any, Card.id)))
-    rows = session.exec(stmt).all()
-
+    rows = session.exec(stmt.order_by(desc(card_id))).all()
     return [
         CardAdminRead(
-            id=card.id,
+            id=int(card.id or 0),
+            deck_id=card.deck_id,
             word=card.word,
             definition=card.definition,
             topic=card.topic,
@@ -189,87 +238,78 @@ def list_cards_admin(
             kind=card.kind,
             is_builtin=card.is_builtin,
             created_at=card.created_at,
-            bin=uc.bin,
-            status=uc.status,
+            bin=uc.bin if uc is not None else 0,
+            status=uc.status if uc is not None else "active",
         )
         for card, uc in rows
     ]
 
 
 @router.get("/cards/stats", response_model=CardStats)
-def card_stats(session: Session = Depends(get_session)) -> CardStats:
-    """Return aggregate study stats for the shared demo user."""
-    total_cards = session.exec(
-        select(func.count())
-        .select_from(UserCard)
-        .where(UserCard.user_id == DEFAULT_USER_ID)
-    ).one()
+def card_stats(
+    deck_id: int | None = Query(None),
+    user: User | None = Depends(get_optional_user),
+    session: Session = Depends(get_session),
+) -> CardStats:
+    """Return aggregate progress for the selected user and optional deck."""
+    user_id = int(user.id or 0) if user is not None else DEMO_USER_ID
+    conditions: list[Any] = [UserCard.user_id == user_id]
+    if deck_id is not None:
+        conditions.append(Card.deck_id == deck_id)
 
-    status_rows = session.exec(
-        select(UserCard.status, func.count())
-        .where(UserCard.user_id == DEFAULT_USER_ID)
-        .group_by(UserCard.status)
-    ).all()
-    status_counts: Dict[str, int] = {str(s): int(c) for s, c in status_rows}
-
-    bin_rows = session.exec(
-        select(cast(Any, UserCard.bin), func.count())
-        .where(UserCard.user_id == DEFAULT_USER_ID)
-        .group_by(cast(Any, UserCard.bin))
-    ).all()
+    base = select(UserCard).join(Card, UserCard.card_id == Card.id).where(*conditions)
+    rows = session.exec(base).all()
     by_bin: Dict[int, int] = {i: 0 for i in range(12)}
-    for b, c in bin_rows:
-        by_bin[int(b)] = int(c)
+    status_counts: Dict[str, int] = {}
+    for uc in rows:
+        by_bin[int(uc.bin)] += 1
+        status_counts[uc.status] = status_counts.get(uc.status, 0) + 1
 
     return CardStats(
-        total_cards=int(total_cards or 0),
-        active=int(status_counts.get("active", 0)),
-        never=int(status_counts.get("never", 0)),
-        hard_to_remember=int(status_counts.get("hard_to_remember", 0)),
+        total_cards=len(rows),
+        active=status_counts.get("active", 0),
+        never=status_counts.get("never", 0),
+        hard_to_remember=status_counts.get("hard_to_remember", 0),
         by_bin=by_bin,
     )
 
 
-@router.post("/admin/reset")
 @router.post("/cards/admin/reset")
-def reset_all_progress(
+def reset_demo_progress(
     session: Session = Depends(get_session),
     demo_password: str | None = Header(None, alias="X-Demo-Admin-Password"),
 ) -> dict[str, int | bool]:
-    """Reset shared demo progress after verifying the demo admin password."""
+    """Reset only the anonymous featured-demo progress after admin verification."""
     _require_demo_password(demo_password)
-
-    card_ids = session.exec(select(Card.id)).all()
-    existing_card_ids = set(
+    builtin_ids = list(
+        session.exec(select(Card.id).where(Card.is_builtin == True)).all()  # noqa: E712
+    )
+    existing_ids = set(
         session.exec(
-            select(UserCard.card_id).where(UserCard.user_id == DEFAULT_USER_ID)
+            select(UserCard.card_id).where(
+                UserCard.user_id == DEMO_USER_ID,
+                cast(Any, UserCard.card_id).in_(builtin_ids),
+            )
         ).all()
     )
-    to_insert = [cid for cid in card_ids if cid not in existing_card_ids]
+    to_insert = [cid for cid in builtin_ids if cid not in existing_ids]
     for cid in to_insert:
-        session.add(
-            UserCard(
-                user_id=DEFAULT_USER_ID,
-                card_id=cid,
-                bin=0,
-                wrong_count=0,
-                next_review_at=None,
-                status="active",
-            )
-        )
+        session.add(UserCard(user_id=DEMO_USER_ID, card_id=cid, bin=0))
 
-    deleted_reviews = (
-        session.exec(delete(Review).where(Review.user_id == DEFAULT_USER_ID)).rowcount
-        or 0
-    )
-    updated_usercards = (
-        session.exec(
-            update(UserCard)
-            .where(UserCard.user_id == DEFAULT_USER_ID)
-            .values(bin=0, wrong_count=0, next_review_at=None, status="active")
-        ).rowcount
-        or 0
-    )
+    deleted_reviews = session.exec(
+        delete(Review).where(
+            Review.user_id == DEMO_USER_ID,
+            cast(Any, Review.card_id).in_(builtin_ids),
+        )
+    ).rowcount or 0
+    updated_usercards = session.exec(
+        update(UserCard)
+        .where(
+            UserCard.user_id == DEMO_USER_ID,
+            cast(Any, UserCard.card_id).in_(builtin_ids),
+        )
+        .values(bin=0, wrong_count=0, next_review_at=None, status="active")
+    ).rowcount or 0
 
     session.commit()
     return {
