@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { getAccessToken, getMe, login as apiLogin, logout as apiLogout } from "./api";
 import type { LoginPayload, UserRead } from "./types";
 
@@ -16,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserRead | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!getAccessToken()) {
       setUser(null);
       setLoading(false);
@@ -29,26 +37,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refresh]);
 
-  async function signIn(payload: LoginPayload): Promise<UserRead> {
+  const signIn = useCallback(async (payload: LoginPayload): Promise<UserRead> => {
     const response = await apiLogin(payload);
     setUser(response.user);
     return response.user;
-  }
+  }, []);
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     await apiLogout();
     setUser(null);
-  }
+  }, []);
 
   const value = useMemo(
     () => ({ user, loading, signIn, signOut, refresh }),
-    [user, loading]
+    [user, loading, signIn, signOut, refresh]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
