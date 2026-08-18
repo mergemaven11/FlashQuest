@@ -2,6 +2,8 @@
 
 export type ISODate = string;
 export type CardKind = "concept" | "lab";
+export type DeckDifficulty = "beginner" | "intermediate" | "advanced" | "expert";
+export type DeckVisibility = "private" | "unlisted" | "public";
 
 export interface UserRead {
   id: number;
@@ -13,12 +15,21 @@ export interface UserRead {
 export interface DeckRead {
   id: number;
   owner_id: number | null;
+  creator_display_name: string | null;
   title: string;
   slug: string;
   description: string;
   is_builtin: boolean;
+  is_official: boolean;
+  subject: string;
+  difficulty: DeckDifficulty | string;
+  visibility: DeckVisibility | string;
+  tags: string[];
+  published_at: ISODate | null;
+  source_deck_id: number | null;
   card_count: number;
   created_at: ISODate;
+  updated_at: ISODate;
 }
 
 export interface CardRead {
