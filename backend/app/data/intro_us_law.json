@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "name": "Intro to U.S. Law",
+  "card_count": 30,
+  "domains": [
+    {
+      "name": "Legal System & Sources",
+      "cards": [
+        {"prompt": "U.S. Law · What is the purpose of a constitution in the U.S. legal system?", "answer": "A constitution establishes governmental structure, grants and limits public power, and protects certain rights; federal and state constitutions operate within their respective spheres."},
+        {"prompt": "U.S. Law · What is a statute?", "answer": "A statute is a law enacted by a legislative body, such as Congress or a state legislature, through the applicable lawmaking process."},
+        {"prompt": "U.S. Law · What is a regulation?", "answer": "A regulation is a rule issued by an authorized administrative agency under authority granted by law and subject to applicable procedural and judicial constraints."},
+        {"prompt": "U.S. Law · What is case law?", "answer": "Case law is law developed through judicial decisions interpreting constitutions, statutes, regulations, contracts, and prior legal principles."},
+        {"prompt": "U.S. Law · What is precedent?", "answer": "Precedent is an earlier judicial decision used as authority in later cases involving sufficiently similar legal issues; how binding it is depends on the court hierarchy and jurisdiction."},
+        {"prompt": "U.S. Law · What is jurisdiction?", "answer": "Jurisdiction is a court's legal authority to hear and decide a matter, including authority over the type of case and, where required, the parties or property involved."}
+      ]
+    },
+    {
+      "name": "Constitutional Structure",
+      "cards": [
+        {"prompt": "U.S. Law · What is separation of powers?", "answer": "It is the constitutional division of governmental authority among legislative, executive, and judicial branches, with different functions and checks among them."},
+        {"prompt": "U.S. Law · What is federalism?", "answer": "Federalism is the division of governmental authority between the federal government and the states under the U.S. constitutional system."},
+        {"prompt": "U.S. Law · What does judicial review mean?", "answer": "Judicial review is the power of courts, in proper cases, to determine whether governmental acts comply with higher legal authority such as a constitution."},
+        {"prompt": "U.S. Law · What is the Supremacy Clause generally about?", "answer": "It establishes that valid federal constitutional and statutory law can control over conflicting state law within the scope of federal authority."},
+        {"prompt": "U.S. Law · What is due process in broad terms?", "answer": "Due process refers to constitutional protections requiring government to respect legally required procedures and, in some contexts, substantive limits before depriving a person of life, liberty, or property."},
+        {"prompt": "U.S. Law · What is equal protection in broad terms?", "answer": "Equal protection is the constitutional principle that government classifications and unequal treatment are subject to legal scrutiny, with the level of scrutiny depending on the classification and right involved."}
+      ]
+    },
+    {
+      "name": "Civil, Criminal & Procedure",
+      "cards": [
+        {"prompt": "U.S. Law · What is a civil case?", "answer": "A civil case is a noncriminal legal dispute in which a party seeks a remedy such as damages, an injunction, a declaration of rights, or another civil form of relief."},
+        {"prompt": "U.S. Law · What is a criminal case?", "answer": "A criminal case is a prosecution by the government alleging conduct defined as a crime and seeking criminal sanctions authorized by law."},
+        {"prompt": "U.S. Law · What is a burden of proof?", "answer": "It is the legal standard specifying how strongly a party must establish a fact or claim; the applicable standard differs by context and type of proceeding."},
+        {"prompt": "U.S. Law · What does 'beyond a reasonable doubt' refer to?", "answer": "It is the high burden of proof the prosecution must satisfy to obtain a criminal conviction in the United States."},
+        {"prompt": "U.S. Law · What is standing?", "answer": "Standing is a doctrine requiring a party seeking judicial relief to have the kind of concrete, legally cognizable interest or injury required for that court to hear the dispute."},
+        {"prompt": "U.S. Law · What is an appeal?", "answer": "An appeal asks a higher court to review specified rulings of a lower court; appellate review usually focuses on claimed legal error rather than simply retrying the entire case."}
+      ]
+    },
+    {
+      "name": "Contracts & Torts",
+      "cards": [
+        {"prompt": "U.S. Law · What is a contract in general terms?", "answer": "A contract is an agreement the law recognizes as creating enforceable obligations; the exact requirements and defenses depend on the governing law and transaction."},
+        {"prompt": "U.S. Law · What is consideration in traditional contract doctrine?", "answer": "Consideration is a bargained-for exchange of legal value that traditionally helps distinguish enforceable promises from gratuitous promises, subject to important exceptions and jurisdictional rules."},
+        {"prompt": "U.S. Law · What is a breach of contract?", "answer": "A breach occurs when a party fails to perform a contractual duty when performance is due and no legal excuse or defense applies."},
+        {"prompt": "U.S. Law · What is a tort?", "answer": "A tort is a civil wrong, other than breach of contract, for which the law may provide a remedy such as damages or injunctive relief."},
+        {"prompt": "U.S. Law · What are the basic elements commonly associated with negligence?", "answer": "Negligence commonly requires a duty of care, breach of that duty, factual and legal causation, and legally recognized harm; details vary by jurisdiction and context."},
+        {"prompt": "U.S. Law · What is an intentional tort?", "answer": "It is a tort based on intentional conduct that satisfies the elements of a recognized claim, such as certain forms of battery, assault, trespass, or false imprisonment; exact rules vary."}
+      ]
+    },
+    {
+      "name": "Property, Research & Legal Practice",
+      "cards": [
+        {"prompt": "U.S. Law · What is real property?", "answer": "Real property generally concerns land and interests attached to land, while personal property generally covers other forms of property; precise classifications can vary by law and context."},
+        {"prompt": "U.S. Law · What is a deed?", "answer": "A deed is a legal instrument used to transfer an interest in real property, subject to formal requirements and recording rules that vary by jurisdiction."},
+        {"prompt": "U.S. Law · What is an easement?", "answer": "An easement is a nonpossessory legal right to use or control another person's land for a particular purpose, such as access or utilities."},
+        {"prompt": "U.S. Law · What is the difference between primary and secondary legal authority?", "answer": "Primary authority is law itself, such as constitutions, statutes, regulations, and cases; secondary authority explains or analyzes law, such as treatises, articles, and practice guides."},
+        {"prompt": "U.S. Law · Why does jurisdiction matter when researching a legal question?", "answer": "A rule may differ among federal and state systems, and authorities from one jurisdiction may be binding, persuasive, or irrelevant in another."},
+        {"prompt": "U.S. Law · Why should a study deck about law not be treated as legal advice?", "answer": "Legal outcomes depend on facts, jurisdiction, current law, procedure, and professional judgment. Educational summaries cannot evaluate a specific person's legal rights or obligations."}
+      ]
+    }
+  ]
+}
