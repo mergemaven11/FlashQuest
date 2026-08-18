@@ -1,22 +1,16 @@
 // frontend/src/api.ts
-/**
- * Minimal API client using axios with friendly errors + health check.
- * Base URL comes from Vite env, then a production-safe fallback, then localhost.
- *
- * Also exports spaced-repetition helpers to display bin timers in the UI.
- */
-
 import axios from "axios";
 import type {
-  CardRead,
   CardAdminRead,
-  StudyNext,
+  CardRead,
   CreateCardPayload,
+  StudyNext,
+  StudyTopicSummary,
+  UpdateCardPayload,
 } from "./types";
 
 export type StudyTrack = "mixed" | "concept" | "lab";
 
-/** Map of bin -> delay in milliseconds (must mirror backend schedule). */
 export const BIN_DELAYS: Record<number, number> = {
   0: 0,
   1: 5_000,
@@ -46,11 +40,9 @@ export function formatDelay(ms: number): string {
   if (m < 60) return `${m}m`;
   const h = Math.round(m / 60);
   if (h < 24) return `${h}h`;
-  const d = Math.round(h / 24);
-  return `${d}d`;
+  return `${Math.round(h / 24)}d`;
 }
 
-/** Resolve API base URL for diagnostics and production. */
 export function apiBaseURL(): string {
   const configured = import.meta.env.VITE_API_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
@@ -73,12 +65,10 @@ api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (axios.isCancel?.(err)) return Promise.reject(err);
-
     console.error("API error:", {
       url: err?.config?.url,
       method: err?.config?.method,
       status: err?.response?.status,
-      headers: err?.response?.headers,
       data: err?.response?.data,
       message: err?.message,
     });
@@ -107,10 +97,22 @@ export async function checkApi(): Promise<boolean> {
   }
 }
 
-export async function getStudyNext(track: StudyTrack = "mixed"): Promise<StudyNext> {
+export async function getStudyTopics(): Promise<StudyTopicSummary[]> {
+  try {
+    const { data } = await api.get<StudyTopicSummary[]>("/study/topics");
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
+export async function getStudyNext(
+  track: StudyTrack = "mixed",
+  topic?: string
+): Promise<StudyNext> {
   try {
     const { data } = await api.get<StudyNext>("/study/next", {
-      params: { track },
+      params: { track, topic: topic || undefined },
     });
     return data;
   } catch (e) {
@@ -120,26 +122,11 @@ export async function getStudyNext(track: StudyTrack = "mixed"): Promise<StudyNe
 
 export type AnswerResponse = { ok: boolean; to_bin: number; status: string };
 
-export function postStudyAnswer(
+export async function postStudyAnswer(
   cardId: number,
   result: "correct" | "wrong"
-): Promise<AnswerResponse>;
-export function postStudyAnswer(args: {
-  cardId: number;
-  result: "correct" | "wrong";
-}): Promise<AnswerResponse>;
-export async function postStudyAnswer(
-  a:
-    | number
-    | {
-        cardId: number;
-        result: "correct" | "wrong";
-      },
-  b?: "correct" | "wrong"
 ): Promise<AnswerResponse> {
   try {
-    const cardId = typeof a === "number" ? a : a.cardId;
-    const result = typeof a === "number" ? (b as "correct" | "wrong") : a.result;
     const { data } = await api.post<AnswerResponse>("/study/answer", null, {
       params: { card_id: cardId, result },
     });
@@ -158,6 +145,18 @@ export async function createCard(payload: CreateCardPayload): Promise<CardRead> 
   }
 }
 
+export async function updateCard(
+  id: number,
+  payload: UpdateCardPayload
+): Promise<CardRead> {
+  try {
+    const { data } = await api.patch<CardRead>(`/cards/${id}`, payload);
+    return data;
+  } catch (e) {
+    throw normalizeError(e);
+  }
+}
+
 export async function listAdminCards(q?: string): Promise<CardAdminRead[]> {
   try {
     const { data } = await api.get<CardAdminRead[]>("/cards/admin", {
@@ -169,28 +168,27 @@ export async function listAdminCards(q?: string): Promise<CardAdminRead[]> {
   }
 }
 
-export async function adminReset(): Promise<{
+export async function adminReset(password: string): Promise<{
   ok: boolean;
   inserted_usercards: number;
   deleted_reviews: number;
   updated_usercards: number;
 }> {
   try {
-    const { data } = await api.post("/cards/admin/reset");
-    return data as {
-      ok: boolean;
-      inserted_usercards: number;
-      deleted_reviews: number;
-      updated_usercards: number;
-    };
+    const { data } = await api.post("/cards/admin/reset", null, {
+      headers: { "X-Demo-Admin-Password": password },
+    });
+    return data;
   } catch (e) {
     throw normalizeError(e);
   }
 }
 
-export async function deleteCard(id: number): Promise<void> {
+export async function deleteCard(id: number, password?: string): Promise<void> {
   try {
-    await api.delete(`/cards/${id}`);
+    await api.delete(`/cards/${id}`, {
+      headers: password ? { "X-Demo-Admin-Password": password } : undefined,
+    });
   } catch (e) {
     throw normalizeError(e);
   }
