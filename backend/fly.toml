@@ -5,7 +5,7 @@
 # Deploy token configured: trigger a fresh production rollout.
 
 app = 'flashcards-tobias'
-primary_region = 'atl'
+primary_region = 'dfw'
 
 [build]
   dockerfile = "./Dockerfile"
