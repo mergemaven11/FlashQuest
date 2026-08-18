@@ -137,7 +137,7 @@ Fly is configured for:
 
 ```text
 EMAIL_DELIVERY_MODE=resend
-FRONTEND_URL=https://flashcards-tobias.netlify.app
+FRONTEND_URL=https://flaskquest.netlify.app
 ```
 
 Before enabling public signup, configure the provider secret and demo-owner secret:
@@ -290,7 +290,8 @@ FlashQuest’s has two separate Netlify concerns:
 ### React application
 
 ```text
-Site: flashcards-tobias
+Site: flaskquest
+URL: https://flaskquest.netlify.app/
 Base directory: frontend
 Build command: npm run build
 Publish directory: dist
