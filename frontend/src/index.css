@@ -23,6 +23,7 @@
 
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--ink-black); }
+html[data-text-scale="large"] { font-size: 112.5%; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--ink-black); }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
@@ -198,6 +199,43 @@ select.game-input option { background: var(--ink-black); color: white; }
   0% { transform: translateY(8px) scale(.9); opacity: 0; }
   70% { transform: translateY(-2px) scale(1.04); opacity: 1; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* Experience preferences are presentation-only. They never alter study data. */
+html[data-learning-mode="focus"] .game-grid { display: none; }
+html[data-learning-mode="focus"] .floaty { animation: none; }
+html[data-learning-mode="focus"] .game-page-enter { animation-duration: 80ms; }
+html[data-learning-mode="focus"] .game-panel,
+html[data-learning-mode="focus"] .quest-card {
+  backdrop-filter: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .24);
+}
+html[data-learning-mode="focus"] .quest-card::after { display: none; }
+
+html[data-high-contrast="true"] .game-panel,
+html[data-high-contrast="true"] .quest-card,
+html[data-high-contrast="true"] .game-chip,
+html[data-high-contrast="true"] .game-input,
+html[data-high-contrast="true"] .deck-input {
+  border-color: rgba(255, 255, 255, .3);
+}
+html[data-high-contrast="true"] .game-panel {
+  background: rgba(3, 7, 30, .96);
+}
+html[data-high-contrast="true"] .game-chip { background: rgba(255, 255, 255, .1); }
+html[data-high-contrast="true"] :where(.text-slate-400, .text-slate-500) { color: #cbd5e1; }
+html[data-high-contrast="true"] :where(a, button, input, textarea, select):focus-visible {
+  outline-width: 3px;
+  outline-color: #ffba08;
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: .01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .01ms !important;
 }
 
 @media (max-width: 480px) {
