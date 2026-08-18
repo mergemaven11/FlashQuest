@@ -1,30 +1,28 @@
 # app/routers/study.py
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, asc, desc, func
 from sqlmodel import Session, select
-from sqlalchemy import asc, desc, func, and_
 
 from ..db import get_session
-from ..models import UserCard, Card, Review
+from ..models import Card, Review, UserCard
 
 router = APIRouter(prefix="/study", tags=["study"])
 DEFAULT_USER_ID = 1
 VALID_TRACKS = {"mixed", "concept", "lab"}
 
 
-# ---------- Time helpers (timezone-aware UTC) ----------
 def _now_utc() -> datetime:
     """Return timezone-aware UTC datetime."""
     return datetime.now(timezone.utc)
 
 
-# Spec-accurate bin delays (bins 1–11); bin 11 = never
 BIN_DELAYS: dict[int, Optional[timedelta]] = {
-    0: timedelta(seconds=0),  # new
+    0: timedelta(seconds=0),
     1: timedelta(seconds=5),
     2: timedelta(seconds=25),
     3: timedelta(minutes=2),
@@ -34,69 +32,58 @@ BIN_DELAYS: dict[int, Optional[timedelta]] = {
     7: timedelta(days=1),
     8: timedelta(days=5),
     9: timedelta(days=25),
-    10: timedelta(days=120),  # ~4 months
-    11: None,  # never
+    10: timedelta(days=120),
+    11: None,
 }
 
 
 def _fallback_delay_for_bin(b: int) -> Optional[timedelta]:
-    """Return the spec delay for a bin; None means 'never'."""
+    """Return the configured delay for a bin; None means terminal mastery."""
     return BIN_DELAYS.get(int(b), timedelta(minutes=1))
 
 
 def _next_review_at_from_bin(b: int) -> Optional[datetime]:
-    """Compute next review time as timezone-aware UTC; None for 'never'."""
+    """Compute the next review time in UTC."""
     delay = _fallback_delay_for_bin(b)
     return None if delay is None else _now_utc() + delay
 
 
-def _track_clause(track: str) -> Any | None:
-    """Return a SQL clause that limits study to concepts or break/fix labs."""
-    word = cast(Any, Card.word)
-    if track == "lab":
-        return word.like("LAB ·%")
-    if track == "concept":
-        return ~word.like("LAB ·%")
-    return None
+def _card_filters(topic: str | None, track: str) -> list[Any]:
+    """Build reusable card filters for topic and learning mode."""
+    filters: list[Any] = []
+    if topic:
+        filters.append(cast(Any, Card.topic) == topic)
+    if track in {"concept", "lab"}:
+        filters.append(cast(Any, Card.kind) == track)
+    return filters
 
 
-# ---------- Selection logic ----------
 def _select_next_card_pair(
-    session: Session, track: str = "mixed"
+    session: Session,
+    topic: str | None = None,
+    track: str = "mixed",
 ) -> Optional[tuple[Card, UserCard]]:
-    """
-    Select the next card for the default user and requested study track.
-
-    Selection priority:
-      1) Any due active card (next_review_at <= now), preferring:
-         - Higher bin numbers first
-         - Then earliest due time
-         - Then lowest Card.id (stable)
-      2) If no due cards, return the newest "new" card:
-         - bin = 0 and next_review_at IS NULL
-         - Ordered by created_at DESC, then Card.id DESC
-    """
+    """Select the next due/new card for a topic and learning mode."""
     nr = cast(Any, UserCard.next_review_at)
     b = cast(Any, UserCard.bin)
     cid = cast(Any, Card.id)
     created = cast(Any, Card.created_at)
     uc_card_id = cast(Any, UserCard.card_id)
-    track_clause = _track_clause(track)
+    card_filters = _card_filters(topic, track)
 
     due_conditions: list[Any] = [
         UserCard.user_id == DEFAULT_USER_ID,
         UserCard.status == "active",
         and_(nr.is_not(None), nr <= func.now()),
+        *card_filters,
     ]
     new_conditions: list[Any] = [
         UserCard.user_id == DEFAULT_USER_ID,
         UserCard.status == "active",
         cast(Any, UserCard.bin) == 0,
         nr.is_(None),
+        *card_filters,
     ]
-    if track_clause is not None:
-        due_conditions.append(track_clause)
-        new_conditions.append(track_clause)
 
     due_stmt = (
         select(Card, UserCard)
@@ -123,16 +110,35 @@ def _select_next_card_pair(
     return None
 
 
-# --- Public function expected by tests ---
 def select_next_card(session: Session) -> Optional[Card]:
-    """Return only the Card (or None) using the mixed-deck priority."""
+    """Compatibility helper used by tests and callers that want a mixed deck."""
     pair = _select_next_card_pair(session)
     return pair[0] if pair else None
 
 
-# ---------- Routes ----------
+@router.get("/topics")
+def study_topics(session: Session = Depends(get_session)) -> list[dict[str, Any]]:
+    """Return available topics with concept/lab counts for the topic picker."""
+    rows = session.exec(select(Card.topic, Card.kind)).all()
+    topics: dict[str, dict[str, Any]] = {}
+    for topic_value, kind_value in rows:
+        topic = str(topic_value or "Custom")
+        kind = str(kind_value or "concept")
+        item = topics.setdefault(
+            topic,
+            {"topic": topic, "total": 0, "concepts": 0, "labs": 0},
+        )
+        item["total"] += 1
+        if kind == "lab":
+            item["labs"] += 1
+        else:
+            item["concepts"] += 1
+    return sorted(topics.values(), key=lambda item: (-item["total"], item["topic"]))
+
+
 @router.get("/next")
 def study_next(
+    topic: str | None = Query(None, description="Optional topic/deck name"),
     track: str = Query(
         "mixed",
         description="Study track: mixed, concept, or lab",
@@ -140,7 +146,7 @@ def study_next(
     ),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """Return the next due/new card for the selected study track."""
+    """Return the next due/new card for the selected topic and track."""
     if track not in VALID_TRACKS:
         raise HTTPException(status_code=422, detail="invalid study track")
 
@@ -149,10 +155,8 @@ def study_next(
     active_conditions: list[Any] = [
         UserCard.user_id == DEFAULT_USER_ID,
         UserCard.status == "active",
+        *_card_filters(topic, track),
     ]
-    track_clause = _track_clause(track)
-    if track_clause is not None:
-        active_conditions.append(track_clause)
 
     has_active = session.exec(
         select(UserCard.id)
@@ -162,7 +166,7 @@ def study_next(
     if has_active is None:
         return {"status": "permanently_done"}
 
-    pair = _select_next_card_pair(session, track)
+    pair = _select_next_card_pair(session, topic, track)
     if pair:
         card, uc = pair
         return {
@@ -171,6 +175,10 @@ def study_next(
                 "id": card.id,
                 "word": card.word,
                 "definition": card.definition,
+                "topic": card.topic,
+                "domain": card.domain,
+                "kind": card.kind,
+                "is_builtin": card.is_builtin,
                 "bin": uc.bin,
                 "status": uc.status,
             },
@@ -185,16 +193,7 @@ def submit_answer(
     result: str = Query(..., description="'correct' or 'wrong'"),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """
-    Accept an answer and update spaced-repetition state.
-
-    Query Args:
-        card_id: Card to answer.
-        result: 'correct' or 'wrong'.
-
-    Returns:
-        {"ok": True, "to_bin": int, "status": "active|hard_to_remember|never"}
-    """
+    """Accept an answer and update spaced-repetition state."""
     if result not in ("correct", "wrong"):
         raise HTTPException(
             status_code=422, detail="result must be 'correct' or 'wrong'"
@@ -210,7 +209,6 @@ def submit_answer(
         raise HTTPException(status_code=404, detail="Card not found")
 
     from_bin = uc.bin
-
     if result == "correct":
         uc.bin = min(uc.bin + 1, 11)
     else:
@@ -220,7 +218,6 @@ def submit_answer(
             uc.status = "hard_to_remember"
 
     uc.next_review_at = _next_review_at_from_bin(uc.bin)
-
     if uc.bin == 11:
         uc.status = "never"
         uc.next_review_at = None
