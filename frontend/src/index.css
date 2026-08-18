@@ -100,6 +100,14 @@ table { border-collapse: collapse; }
   transition: width .45s cubic-bezier(.2, .8, .2, 1);
 }
 
+.ember-text {
+  color: var(--amber-flame);
+  background: linear-gradient(90deg, var(--cayenne-red), var(--orange), var(--amber-flame));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .game-chip {
   border: 1px solid rgba(255, 255, 255, .085);
   border-radius: 999px;
@@ -115,6 +123,7 @@ table { border-collapse: collapse; }
 .game-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
 .game-button:active:not(:disabled) { transform: translateY(0) scale(.985); }
 
+.game-input,
 .deck-input {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, .11);
@@ -125,12 +134,15 @@ table { border-collapse: collapse; }
   outline: none;
   transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
 }
+.game-input::placeholder,
 .deck-input::placeholder { color: #64748b; }
+.game-input:focus,
 .deck-input:focus {
   border-color: rgba(250, 163, 7, .62);
   box-shadow: 0 0 0 3px rgba(250, 163, 7, .1);
   background: rgba(3, 7, 30, .94);
 }
+select.game-input option { background: var(--ink-black); color: white; }
 
 .metric-label {
   color: var(--amber-flame);
