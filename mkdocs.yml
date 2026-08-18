@@ -1,5 +1,5 @@
-site_name: FlashQuest’s
-site_description: A reusable game-like study engine with a featured Platform Engineering deck, private custom decks, and spaced repetition.
+site_name: FlashQuest
+site_description: A game-like learning platform with spaced repetition, a public deck Library, community remixing, and reusable Arcade foundations.
 site_url: https://flashquest-docs.netlify.app/
 repo_name: mergemaven11/FlashQuest
 repo_url: https://github.com/mergemaven11/FlashQuest
@@ -64,7 +64,7 @@ extra_css:
 
 nav:
   - Home: index.md
-  - Open FlashQuest’s: https://flaskquest.netlify.app/
+  - Open FlashQuest: https://flaskquest.netlify.app/
   - Product:
       - Make Your Own Deck: MAKE_YOUR_OWN_DECK.md
       - Accounts & Email Verification: AUTHENTICATION.md
@@ -73,6 +73,7 @@ nav:
       - Break/Fix Labs: LABS.md
   - Engineering:
       - Architecture & Design: PLATFORM_ENGINEERING.md
+      - Arcade Activity Contract: ARCADE_ACTIVITY_CONTRACT.md
       - Operations & Deployment: OPERATIONS.md
   - Reference:
       - Backend API: backend/api.md
@@ -82,4 +83,4 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/mergemaven11/FlashQuest
-      name: FlashQuest’s on GitHub
+      name: FlashQuest on GitHub
