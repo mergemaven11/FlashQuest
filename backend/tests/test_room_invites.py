@@ -187,7 +187,8 @@ def test_private_room_host_adds_verified_account_by_email(client, sqlite_session
         f"/rooms/{room['id']}/join",
         headers=_headers(sqlite_session, member),
     )
-    assert generic.status_code == 403
+    assert generic.status_code == 404
+    assert generic.json()["detail"] == "Room not found"
 
     added = client.post(
         f"/rooms/{room['id']}/members/add",
