@@ -141,3 +141,23 @@ class RoomMemberRead(SQLModel):
     status: str
     joined_at: datetime
     last_seen_at: datetime
+
+
+class RoomMessageRead(SQLModel):
+    """Durable message shape used by history and realtime snapshots."""
+
+    id: int
+    room_id: int
+    user_id: int
+    author_display_name: str
+    kind: str
+    body: str
+    card_id: Optional[int] = None
+    created_at: datetime
+
+
+class WsTicketResponse(SQLModel):
+    """One-use capability for opening one room WebSocket connection."""
+
+    ticket: str
+    expires_in_seconds: int
