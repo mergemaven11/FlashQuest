@@ -25,6 +25,23 @@ export interface RoomMemberRead {
   status: "active" | "left" | "removed";
   joined_at: string;
   last_seen_at: string;
+  display_name: string | null;
+}
+
+export interface RoomInviteRead {
+  id: number;
+  room_id: number;
+  created_by_user_id: number;
+  expires_at: string;
+  created_at: string;
+  revoked_at: string | null;
+  use_count: number;
+  last_used_at: string | null;
+  active: boolean;
+}
+
+export interface RoomInviteIssued extends RoomInviteRead {
+  token: string;
 }
 
 export interface RoomMessageRead {
@@ -52,6 +69,11 @@ export type RoomRealtimeEvent = {
 };
 
 function normalizeRoomError(error: unknown): Error {
+  if (error && typeof error === "object" && "response" in error) {
+    const response = (error as { response?: { data?: { detail?: unknown } } }).response;
+    const detail = response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) return new Error(detail);
+  }
   if (error instanceof Error) return error;
   return new Error("Quest Room request failed");
 }
@@ -96,6 +118,15 @@ export async function joinRoom(roomId: number): Promise<RoomRead> {
   }
 }
 
+export async function joinRoomByInvite(token: string): Promise<RoomRead> {
+  try {
+    const { data } = await api.post<RoomRead>("/rooms/invites/join", { token });
+    return data;
+  } catch (error) {
+    throw normalizeRoomError(error);
+  }
+}
+
 export async function leaveRoom(roomId: number): Promise<RoomRead> {
   try {
     const { data } = await api.post<RoomRead>(`/rooms/${roomId}/leave`);
@@ -117,6 +148,71 @@ export async function closeRoom(roomId: number): Promise<RoomRead> {
 export async function getRoomMembers(roomId: number): Promise<RoomMemberRead[]> {
   try {
     const { data } = await api.get<RoomMemberRead[]>(`/rooms/${roomId}/members`);
+    return data;
+  } catch (error) {
+    throw normalizeRoomError(error);
+  }
+}
+
+export async function addPrivateRoomMember(
+  roomId: number,
+  email: string
+): Promise<RoomMemberRead> {
+  try {
+    const { data } = await api.post<RoomMemberRead>(`/rooms/${roomId}/members/add`, {
+      email,
+    });
+    return data;
+  } catch (error) {
+    throw normalizeRoomError(error);
+  }
+}
+
+export async function removeRoomMember(
+  roomId: number,
+  userId: number
+): Promise<RoomMemberRead> {
+  try {
+    const { data } = await api.post<RoomMemberRead>(
+      `/rooms/${roomId}/members/${userId}/remove`
+    );
+    return data;
+  } catch (error) {
+    throw normalizeRoomError(error);
+  }
+}
+
+export async function createRoomInvite(
+  roomId: number,
+  expiresInHours = 24
+): Promise<RoomInviteIssued> {
+  try {
+    const { data } = await api.post<RoomInviteIssued>(`/rooms/${roomId}/invites`, {
+      expires_in_hours: expiresInHours,
+    });
+    return data;
+  } catch (error) {
+    throw normalizeRoomError(error);
+  }
+}
+
+export async function getRoomInvites(roomId: number): Promise<RoomInviteRead[]> {
+  try {
+    const { data } = await api.get<RoomInviteRead[]>(`/rooms/${roomId}/invites`);
+    return data;
+  } catch (error) {
+    throw normalizeRoomError(error);
+  }
+}
+
+export async function revokeRoomInvite(
+  roomId: number,
+  inviteId: number
+): Promise<RoomInviteRead> {
+  try {
+    const { data } = await api.post<RoomInviteRead>(
+      `/rooms/${roomId}/invites/${inviteId}/revoke`
+    );
     return data;
   } catch (error) {
     throw normalizeRoomError(error);
