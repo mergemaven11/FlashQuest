@@ -1,11 +1,12 @@
 # Quest Room Arcade V1
 
-This slice makes the first two shared FlashQuest Arcade activities playable inside an existing Quest Room.
+This slice makes the first three shared FlashQuest Arcade activities playable inside an existing Quest Room.
 
 ## Included
 
 - Multiple-Choice Blitz in room mode
 - Match Quest in room mode
+- Sort the Stack in room mode
 - host-controlled start, synchronized reveal, next round, and end
 - server-held pending submissions before reveal
 - shared `ActivityRuntime` / `ActivityPublicState` contract with solo Arcade
@@ -13,6 +14,12 @@ This slice makes the first two shared FlashQuest Arcade activities playable insi
 - room scoreboard after synchronized reveal
 - live chat and presence while an activity is running
 - host-paced, no-forced-timer presentation
+
+## Sort the Stack
+
+Sort the Stack presents terms and definitions, then asks the learner to place each card into its correct learning-domain bucket. The card's domain is the answer for this activity, so it is intentionally absent from the pre-reveal item payload. A compatible deck needs at least four cards across at least two distinct domains.
+
+The same Sort adapter runs in solo Arcade and Quest Rooms. Room submissions follow the same synchronized spoiler boundary as Blitz and Match Quest.
 
 ## Spoiler boundary
 
@@ -24,7 +31,6 @@ The room, membership, and chat history remain durable PostgreSQL state. Active r
 
 ## Still tracked in #23
 
-- Sort the Stack
 - Boss Battle
 - Debug Dungeon for compatible decks
 - additional shared-game polish and room challenge variants

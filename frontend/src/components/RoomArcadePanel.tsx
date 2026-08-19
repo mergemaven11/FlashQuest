@@ -28,6 +28,9 @@ type MatchPayload = {
   choices: BlitzChoice[];
 };
 type MatchMap = Record<string, string>;
+type SortItem = { card_id: number; prompt: string; clue: string };
+type SortPayload = { items: SortItem[]; buckets: string[]; axis: "domain" };
+type SortMap = Record<string, string>;
 
 type Props = {
   activity: RoomActivitySnapshot | null;
@@ -46,10 +49,20 @@ function matchPayload(state: ActivityPublicState): MatchPayload {
   return state.payload as unknown as MatchPayload;
 }
 
+function sortPayload(state: ActivityPublicState): SortPayload {
+  return state.payload as unknown as SortPayload;
+}
+
 function displayName(userId: string, currentUserId: number, presence: PresenceUser[]): string {
   const numericId = Number(userId);
   if (numericId === currentUserId) return "You";
   return presence.find((person) => person.user_id === numericId)?.display_name ?? `Player #${userId}`;
+}
+
+function gameBadge(state: ActivityPublicState): string {
+  if (state.definition.type === "blitz") return "⚡ BLITZ";
+  if (state.definition.type === "match") return "🧩 MATCH QUEST";
+  return "🗃️ SORT THE STACK";
 }
 
 function Scoreboard({
@@ -96,11 +109,13 @@ export default function RoomArcadePanel({
   onSend,
 }: Props) {
   const [matches, setMatches] = useState<MatchMap>({});
+  const [placements, setPlacements] = useState<SortMap>({});
   const state = activity?.state ?? null;
   const submitted = activity?.submitted_user_ids.includes(userId) ?? false;
 
   useEffect(() => {
     setMatches({});
+    setPlacements({});
   }, [state?.session_id, state?.round_index]);
 
   const presenceNames = useMemo(
@@ -108,7 +123,7 @@ export default function RoomArcadePanel({
     [presence]
   );
 
-  function start(activityType: "blitz" | "match") {
+  function start(activityType: "blitz" | "match" | "sort") {
     onSend("activity.start", { activity_type: activityType, round_count: 5 });
   }
 
@@ -122,7 +137,7 @@ export default function RoomArcadePanel({
               {state?.phase === "complete" ? "Quest cleared. Run it back?" : "Same room. Same question. Everybody plays."}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-              Blitz and Match Quest use the same server-authoritative activity runtime as solo Arcade. Room rounds are host-paced and untimed by default.
+              Blitz, Match Quest, and Sort the Stack use the same server-authoritative runtime as solo Arcade. Room rounds are host-paced and untimed by default.
             </p>
             {state?.phase === "complete" && (
               <Scoreboard state={state} userId={userId} presence={presence} />
@@ -146,6 +161,14 @@ export default function RoomArcadePanel({
               >
                 🧩 Start Match Quest
               </button>
+              <button
+                type="button"
+                disabled={!connectionLive}
+                onClick={() => start("sort")}
+                className="game-button border border-violet-300/25 bg-violet-300/[0.08] px-4 py-3 text-sm font-black text-violet-100"
+              >
+                🗃️ Start Sort the Stack
+              </button>
             </div>
           ) : (
             <div className="game-chip px-4 py-3 text-sm font-black text-slate-300">
@@ -166,7 +189,7 @@ export default function RoomArcadePanel({
           <div>
             <div className="flex flex-wrap gap-2">
               <span className="game-chip px-2.5 py-1 text-xs font-black text-[#ffba08]">
-                {state.definition.type === "blitz" ? "⚡ BLITZ" : "🧩 MATCH QUEST"}
+                {gameBadge(state)}
               </span>
               <span className="game-chip px-2.5 py-1 text-xs font-black text-slate-300">
                 Round {state.round_index + 1}/{state.total_rounds}
@@ -190,7 +213,7 @@ export default function RoomArcadePanel({
             connectionLive={connectionLive}
             onSubmit={(choiceId) => onSend("activity.submit", { choice_id: choiceId })}
           />
-        ) : (
+        ) : state.definition.type === "match" ? (
           <MatchRound
             state={state}
             matches={matches}
@@ -200,6 +223,17 @@ export default function RoomArcadePanel({
               setMatches((current) => ({ ...current, [String(cardId)]: choiceId }))
             }
             onSubmit={() => onSend("activity.submit", { matches })}
+          />
+        ) : (
+          <SortRound
+            state={state}
+            placements={placements}
+            submitted={submitted}
+            connectionLive={connectionLive}
+            onPlace={(cardId, domain) =>
+              setPlacements((current) => ({ ...current, [String(cardId)]: domain }))
+            }
+            onSubmit={() => onSend("activity.submit", { placements })}
           />
         )}
 
@@ -379,6 +413,81 @@ function MatchRound({
             className="game-button bg-[#ffba08] px-5 py-3 font-black text-[#370617]"
           >
             🧩 Submit matches
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SortRound({
+  state,
+  placements,
+  submitted,
+  connectionLive,
+  onPlace,
+  onSubmit,
+}: {
+  state: ActivityPublicState;
+  placements: SortMap;
+  submitted: boolean;
+  connectionLive: boolean;
+  onPlace: (cardId: number, domain: string) => void;
+  onSubmit: () => void;
+}) {
+  const payload = sortPayload(state);
+  const answerMap = (state.reveal?.answer_map ?? {}) as Record<string, string>;
+  const revealed = state.phase === "reveal" || state.phase === "result";
+  const completeBoard = payload.items.every((item) => Boolean(placements[String(item.card_id)]));
+
+  return (
+    <div className="mt-6">
+      <p className="text-sm leading-6 text-slate-400">
+        Sort each card into its correct domain. The domain itself stays hidden until synchronized reveal; selects keep the game usable without drag-and-drop.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {payload.buckets.map((bucket) => (
+          <span key={bucket} className="game-chip px-3 py-1.5 text-xs font-black text-cyan-100">📚 {bucket}</span>
+        ))}
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {payload.items.map((item) => {
+          const correctDomain = answerMap[String(item.card_id)] ?? "";
+          return (
+            <label key={item.card_id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <span className="text-sm font-black text-white">{item.prompt}</span>
+              <span className="mt-2 block text-sm leading-6 text-slate-400">{item.clue}</span>
+              {revealed ? (
+                <span className="mt-3 block rounded-xl border border-emerald-300/20 bg-emerald-300/[0.07] px-3 py-2 text-sm text-emerald-100">
+                  ✓ {correctDomain || "Correct domain"}
+                </span>
+              ) : (
+                <select
+                  className="game-input mt-3"
+                  aria-label={`Domain for ${item.prompt}`}
+                  value={placements[String(item.card_id)] ?? ""}
+                  disabled={!connectionLive || submitted}
+                  onChange={(event) => onPlace(item.card_id, event.target.value)}
+                >
+                  <option value="">Choose domain…</option>
+                  {payload.buckets.map((bucket) => (
+                    <option key={bucket} value={bucket}>{bucket}</option>
+                  ))}
+                </select>
+              )}
+            </label>
+          );
+        })}
+      </div>
+      {!revealed && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            disabled={!connectionLive || submitted || !completeBoard}
+            onClick={onSubmit}
+            className="game-button bg-[#ffba08] px-5 py-3 font-black text-[#370617]"
+          >
+            🗃️ Submit stack
           </button>
         </div>
       )}

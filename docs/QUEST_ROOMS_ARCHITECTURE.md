@@ -121,17 +121,19 @@ Every mutation is authorized server-side regardless of what controls the client 
 
 Room games do **not** get a second multiplayer game engine. Quest Rooms host the same `ActivityRuntime` and `ActivityPublicState` used by solo Arcade.
 
-The first room-playable adapters are **Multiple-Choice Blitz** and **Match Quest**:
+The current room-playable adapters are **Multiple-Choice Blitz**, **Match Quest**, and **Sort the Stack**:
 
 - the host starts the activity against the room's existing deck;
 - all members receive the same prompt/board state;
 - participant responses are stored server-side as pending round submissions;
-- submitting does **not** expose correctness, score changes, or answer ids;
+- submitting does **not** expose correctness, score changes, answer ids, match maps, or domain placements;
 - the host performs one synchronized reveal, which scores every pending submission through the shared solo scoring adapter and publishes the answer plus room scoreboard together;
 - the host advances or ends the activity without recreating/closing the room;
 - reconnecting or joining late restores the current phase-safe activity snapshot;
 - room chat remains available while the game is active;
 - room rounds are host-paced and untimed by default, preserving a Chill/no-timer path for activities whose timers are optional.
+
+Sort the Stack uses the card's domain as its hidden answer. A compatible Sort deck needs at least four cards across two or more distinct domains; one-domain decks are rejected server-side rather than generating a fake one-bucket game.
 
 Correct answer ids/maps stay server-internal until synchronized reveal. Room Arcade score remains separate from each learner's spaced-repetition mastery. Future mastery updates go through the dedicated per-card progress adapter rather than mutating bins from room UI state.
 
