@@ -8,11 +8,11 @@ Quest Rooms are **deck-linked study session containers**. Chat, card sharing, pr
 | --- | --- | --- |
 | Room identity, host, deck, visibility, status | PostgreSQL | Must survive deploys/restarts |
 | Membership and roles | PostgreSQL | Permissions cannot depend on a socket being connected |
-| Message/card/activity history | PostgreSQL | Reconnect/history must be durable |
+| Message/card-share history | PostgreSQL | Reconnect/history must be durable |
 | Presence and connection counts | Ephemeral realtime process | Heartbeats should not write to the database continuously |
-| Shared Arcade runtime | Realtime host, with phase-safe snapshots | Uses the same activity contract as solo Arcade |
+| Shared Arcade runtime + unrevealed submissions | Ephemeral realtime process | Uses the same activity contract as solo Arcade without persisting answer-bearing round state |
 
-The first realtime implementation keeps presence in memory while FlashQuest runs a single realtime instance. Before horizontal scale, a shared pub/sub layer is required so participants connected to different instances receive the same events.
+The first realtime implementation keeps presence and active Arcade runtime in memory while FlashQuest runs a single realtime instance. Before horizontal scale, a shared pub/sub/state layer is required so participants connected to different instances receive the same events and activity phase.
 
 ## Persistent models
 
@@ -47,7 +47,7 @@ Messages are durable history with room/user attribution.
 - optional `card_id`
 - creation/removal timestamps
 
-Presence is intentionally absent from this model.
+Presence and the active game runtime are intentionally absent from this model.
 
 ## Deck privacy rules
 
@@ -88,44 +88,54 @@ Presence is an in-memory connection registry keyed by room and user, while chat 
 - Multiple tabs may create multiple live connections for one member.
 - `presence.joined` is emitted only for the first live connection for that user.
 - `presence.left` is emitted only after the final live connection closes.
-- Reconnect requests a fresh one-use ticket and receives a `room.snapshot` containing current presence plus the latest durable messages.
+- Reconnect requests a fresh one-use ticket and receives a `room.snapshot` containing current presence, the latest durable messages, and the current phase-safe Arcade snapshot when a game is active.
 - `RoomMember.last_seen_at` is updated opportunistically rather than on every network event.
-- Every chat mutation re-checks durable room membership, so a user removed while connected cannot keep posting with an old socket.
+- Every chat/game mutation re-checks durable room membership, so a user removed while connected cannot keep posting or playing with an old socket.
 - Chat messages are capped at 1,000 characters and have a basic per-user/per-room burst limit.
 - `GET /rooms/{id}/messages` provides durable member-only history independently of the WebSocket connection.
 
-The current connection manager is intentionally single-process. Cross-instance broadcasts require shared pub/sub before running multiple realtime instances.
+The current connection/activity manager is intentionally single-process. Cross-instance broadcasts and synchronized games require shared pub/sub/state before running multiple realtime instances.
 
 ## Realtime event envelope
 
 Quest Rooms use the versioned `quest-room.v1` envelope with room id, event type, server timestamp, and event-specific payload.
 
-Implemented chat/presence events include:
+Implemented events include:
 
 - `room.snapshot`
 - `presence.joined`
 - `presence.left`
 - `message.created`
+- `activity.started`
+- `activity.submitted`
+- `activity.state`
+- `activity.completed`
 - `pong`
 - `error`
 
-Planned shared-study events include:
-
-- `card.shared`
-- `room.updated`
-- `activity.started`
-- `activity.state`
-- `activity.completed`
+Planned shared-study events include `card.shared` and broader `room.updated`/moderation events.
 
 Every mutation is authorized server-side regardless of what controls the client displays.
 
 ## Shared Arcade contract
 
-Room games do **not** get a second multiplayer game engine. Quest Rooms will host the same `ActivityRuntime` used by solo Arcade and broadcast only `ActivityPublicState`.
+Room games do **not** get a second multiplayer game engine. Quest Rooms host the same `ActivityRuntime` and `ActivityPublicState` used by solo Arcade.
 
-Correct answer ids/maps stay server-internal until synchronized reveal. Room/team score remains separate from each learner's spaced-repetition mastery. Future mastery updates go through the dedicated per-card progress adapter rather than mutating bins from room UI state.
+The first room-playable adapters are **Multiple-Choice Blitz** and **Match Quest**:
 
-Room-hosted Arcade synchronization remains a follow-on slice; the current realtime implementation covers chat, presence, durable history, and secure connection tickets.
+- the host starts the activity against the room's existing deck;
+- all members receive the same prompt/board state;
+- participant responses are stored server-side as pending round submissions;
+- submitting does **not** expose correctness, score changes, or answer ids;
+- the host performs one synchronized reveal, which scores every pending submission through the shared solo scoring adapter and publishes the answer plus room scoreboard together;
+- the host advances or ends the activity without recreating/closing the room;
+- reconnecting or joining late restores the current phase-safe activity snapshot;
+- room chat remains available while the game is active;
+- room rounds are host-paced and untimed by default, preserving a Chill/no-timer path for activities whose timers are optional.
+
+Correct answer ids/maps stay server-internal until synchronized reveal. Room Arcade score remains separate from each learner's spaced-repetition mastery. Future mastery updates go through the dedicated per-card progress adapter rather than mutating bins from room UI state.
+
+The active room activity is intentionally ephemeral in this phase. A realtime process restart may end an in-progress room game even though the room, membership, and chat history remain durable.
 
 ## Moderation launch gate
 
@@ -138,4 +148,4 @@ Before broad public-room discovery ships, the realtime/message layer must includ
 - permission-checked message/card posting
 - report/block/ban support from the moderation workstream
 
-The first two controls and membership-checked chat posting exist in the realtime foundation. Broad public-room discovery remains blocked until the remaining moderation/reporting controls are implemented.
+The first two controls and membership-checked chat/game mutations exist in the realtime foundation. Broad public-room discovery remains blocked until the remaining moderation/reporting controls are implemented.
