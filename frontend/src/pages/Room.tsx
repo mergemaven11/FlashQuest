@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import RoomArcadePanel, {
+  type RoomActivitySnapshot,
+} from "../components/RoomArcadePanel";
 import { useAuth } from "../auth";
 import { useGameFeel } from "../gameFeelContext";
 import {
@@ -48,6 +51,14 @@ function presenceFrom(value: unknown): PresenceUser[] {
   );
 }
 
+function roomActivityFrom(value: unknown): RoomActivitySnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  if (!("state" in value) || !("submitted_user_ids" in value)) return null;
+  const candidate = value as RoomActivitySnapshot;
+  if (!candidate.state || !Array.isArray(candidate.submitted_user_ids)) return null;
+  return candidate;
+}
+
 export default function Room() {
   const { roomId: roomIdParam } = useParams();
   const roomId = Number(roomIdParam || 0);
@@ -59,6 +70,7 @@ export default function Room() {
   const [room, setRoom] = useState<RoomRead | null>(null);
   const [messages, setMessages] = useState<RoomMessageRead[]>([]);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
+  const [activity, setActivity] = useState<RoomActivitySnapshot | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +102,7 @@ export default function Room() {
           setMessages(nextMessages.filter(isMessage));
         }
         setPresence(presenceFrom(event.payload.presence));
+        setActivity(roomActivityFrom(event.payload.activity));
         return;
       }
 
@@ -107,6 +120,35 @@ export default function Room() {
             : [...current, message]
         );
         if (message.user_id !== user?.id) play("success");
+        return;
+      }
+
+      if (
+        event.type === "activity.started" ||
+        event.type === "activity.state" ||
+        event.type === "activity.completed"
+      ) {
+        const next = roomActivityFrom(event.payload.activity);
+        setActivity(next);
+        if (next?.state.phase === "complete") play("complete");
+        else if (next?.state.phase === "reveal") play("reveal");
+        else if (next?.state.phase === "prompt") play("roundStart");
+        return;
+      }
+
+      if (event.type === "activity.submitted") {
+        const submitted = event.payload.submitted_user_ids;
+        if (!Array.isArray(submitted)) return;
+        const userIds = submitted.filter((value): value is number => typeof value === "number");
+        setActivity((current) =>
+          current
+            ? {
+                ...current,
+                submitted_user_ids: userIds,
+                submitted_count: userIds.length,
+              }
+            : current
+        );
         return;
       }
 
@@ -249,12 +291,20 @@ export default function Room() {
     }
   }
 
+  function sendRoomEvent(type: string, payload: Record<string, unknown> = {}) {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      setError("Reconnect to the room before sending realtime actions");
+      return;
+    }
+    socket.send(JSON.stringify({ type, payload }));
+  }
+
   function sendChat(event: FormEvent) {
     event.preventDefault();
     const body = draft.trim();
-    const socket = socketRef.current;
-    if (!body || !socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: "chat.send", payload: { body } }));
+    if (!body) return;
+    sendRoomEvent("chat.send", { body });
     setDraft("");
   }
 
@@ -307,7 +357,7 @@ export default function Room() {
               ⚡ Study deck
             </Link>
             <Link to={`/arcade?deck=${room.deck_id}`} className="game-button border border-[#faa307]/25 bg-[#370617]/60 px-3 py-2 text-xs font-black text-[#ffba08]">
-              🎮 Arcade
+              🎮 Solo Arcade
             </Link>
           </div>
         </div>
@@ -338,116 +388,127 @@ export default function Room() {
       )}
 
       {isMember && (
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="game-panel flex min-h-[520px] flex-col overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-              <div>
-                <p className="text-sm font-black text-white">💬 Room chat</p>
-                <p className="mt-0.5 text-xs text-slate-500">Messages persist across reconnects.</p>
+        <>
+          <RoomArcadePanel
+            activity={activity}
+            userId={user.id}
+            isHost={isHost}
+            presence={presence}
+            connectionLive={connection === "live" && room.status === "open"}
+            onSend={sendRoomEvent}
+          />
+
+          <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="game-panel flex min-h-[520px] flex-col overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+                <div>
+                  <p className="text-sm font-black text-white">💬 Room chat</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Chat stays live while the room plays.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="game-chip px-2.5 py-1 text-xs font-black text-slate-300">{connectionLabel}</span>
+                  {room.status === "open" && connection === "offline" && (
+                    <button type="button" className="game-button px-2.5 py-1 text-xs font-black text-[#ffba08]" onClick={() => void connectRealtime()}>
+                      Reconnect
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="game-chip px-2.5 py-1 text-xs font-black text-slate-300">{connectionLabel}</span>
-                {room.status === "open" && connection === "offline" && (
-                  <button type="button" className="game-button px-2.5 py-1 text-xs font-black text-[#ffba08]" onClick={() => void connectRealtime()}>
-                    Reconnect
+
+              <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-5" aria-live="polite">
+                {messages.length === 0 ? (
+                  <div className="grid min-h-60 place-items-center text-center text-sm text-slate-500">
+                    <div><div className="text-4xl">🌱</div><p className="mt-3">No messages yet. Somebody gets to be first.</p></div>
+                  </div>
+                ) : (
+                  messages.map((message) => {
+                    const mine = message.user_id === user.id;
+                    return (
+                      <article key={message.id} className={`max-w-[88%] rounded-2xl border p-3 ${mine ? "ml-auto border-[#faa307]/25 bg-[#faa307]/10" : "border-white/10 bg-black/20"}`}>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <strong className={mine ? "text-[#ffba08]" : "text-slate-200"}>{mine ? "You" : message.author_display_name}</strong>
+                          <span className="text-slate-600">{messageTime(message.created_at)}</span>
+                        </div>
+                        <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-200">{message.body}</p>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+
+              <form className="border-t border-white/10 p-3 sm:p-4" onSubmit={sendChat}>
+                <div className="flex gap-2">
+                  <label htmlFor="room-chat" className="sr-only">Message room</label>
+                  <input
+                    id="room-chat"
+                    className="game-input"
+                    maxLength={1000}
+                    value={draft}
+                    disabled={connection !== "live" || room.status !== "open"}
+                    placeholder={connection === "live" ? "Message the room…" : "Reconnect to chat…"}
+                    onChange={(event) => setDraft(event.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!draft.trim() || connection !== "live" || room.status !== "open"}
+                    className="game-button bg-[#faa307] px-4 font-black text-[#370617]"
+                  >
+                    Send
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <aside className="grid content-start gap-4">
+              <section className="game-panel p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="metric-label">Online now</p>
+                  <span className="game-chip px-2 py-0.5 text-xs font-black text-slate-300">{presence.length}</span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {presence.length === 0 ? (
+                    <p className="text-sm text-slate-500">Presence is offline.</p>
+                  ) : (
+                    presence.map((person) => (
+                      <div key={person.user_id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/15 px-3 py-2 text-sm font-bold text-slate-200">
+                        <span aria-hidden="true">🟢</span>
+                        <span className="truncate">{person.user_id === user.id ? "You" : person.display_name}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className="game-panel p-4">
+                <p className="metric-label">Room controls</p>
+                <p className="mt-2 text-sm text-slate-400">Role: <strong className="text-slate-200">{room.current_user_role}</strong></p>
+                {isHost ? (
+                  <button
+                    type="button"
+                    disabled={busy || room.status === "closed"}
+                    onClick={() => void handleClose()}
+                    className="game-button mt-4 w-full border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm font-black text-rose-200"
+                  >
+                    🔒 Close room
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void handleLeave()}
+                    className="game-button mt-4 w-full border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-black text-slate-200"
+                  >
+                    Leave room
                   </button>
                 )}
-              </div>
-            </div>
+              </section>
 
-            <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-5" aria-live="polite">
-              {messages.length === 0 ? (
-                <div className="grid min-h-60 place-items-center text-center text-sm text-slate-500">
-                  <div><div className="text-4xl">🌱</div><p className="mt-3">No messages yet. Somebody gets to be first.</p></div>
-                </div>
-              ) : (
-                messages.map((message) => {
-                  const mine = message.user_id === user.id;
-                  return (
-                    <article key={message.id} className={`max-w-[88%] rounded-2xl border p-3 ${mine ? "ml-auto border-[#faa307]/25 bg-[#faa307]/10" : "border-white/10 bg-black/20"}`}>
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <strong className={mine ? "text-[#ffba08]" : "text-slate-200"}>{mine ? "You" : message.author_display_name}</strong>
-                        <span className="text-slate-600">{messageTime(message.created_at)}</span>
-                      </div>
-                      <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-200">{message.body}</p>
-                    </article>
-                  );
-                })
-              )}
-            </div>
-
-            <form className="border-t border-white/10 p-3 sm:p-4" onSubmit={sendChat}>
-              <div className="flex gap-2">
-                <label htmlFor="room-chat" className="sr-only">Message room</label>
-                <input
-                  id="room-chat"
-                  className="game-input"
-                  maxLength={1000}
-                  value={draft}
-                  disabled={connection !== "live" || room.status !== "open"}
-                  placeholder={connection === "live" ? "Message the room…" : "Reconnect to chat…"}
-                  onChange={(event) => setDraft(event.target.value)}
-                />
-                <button
-                  type="submit"
-                  disabled={!draft.trim() || connection !== "live" || room.status !== "open"}
-                  className="game-button bg-[#faa307] px-4 font-black text-[#370617]"
-                >
-                  Send
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <aside className="grid content-start gap-4">
-            <section className="game-panel p-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="metric-label">Online now</p>
-                <span className="game-chip px-2 py-0.5 text-xs font-black text-slate-300">{presence.length}</span>
-              </div>
-              <div className="mt-3 space-y-2">
-                {presence.length === 0 ? (
-                  <p className="text-sm text-slate-500">Presence is offline.</p>
-                ) : (
-                  presence.map((person) => (
-                    <div key={person.user_id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/15 px-3 py-2 text-sm font-bold text-slate-200">
-                      <span aria-hidden="true">🟢</span>
-                      <span className="truncate">{person.user_id === user.id ? "You" : person.display_name}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-
-            <section className="game-panel p-4">
-              <p className="metric-label">Room controls</p>
-              <p className="mt-2 text-sm text-slate-400">Role: <strong className="text-slate-200">{room.current_user_role}</strong></p>
-              {isHost ? (
-                <button
-                  type="button"
-                  disabled={busy || room.status === "closed"}
-                  onClick={() => void handleClose()}
-                  className="game-button mt-4 w-full border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm font-black text-rose-200"
-                >
-                  🔒 Close room
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void handleLeave()}
-                  className="game-button mt-4 w-full border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-black text-slate-200"
-                >
-                  Leave room
-                </button>
-              )}
-            </section>
-
-            <p className="px-2 text-xs leading-5 text-slate-600">
-              Presence is realtime process state; membership and messages stay durable in PostgreSQL.
-            </p>
-          </aside>
-        </section>
+              <p className="px-2 text-xs leading-5 text-slate-600">
+                Presence and active Arcade runtime are realtime process state; membership and messages stay durable in PostgreSQL.
+              </p>
+            </aside>
+          </section>
+        </>
       )}
 
       {room.status === "closed" && (
