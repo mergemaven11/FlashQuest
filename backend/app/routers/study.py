@@ -16,6 +16,7 @@ from ..security import DEMO_USER_ID, get_optional_user
 
 router = APIRouter(prefix="/study", tags=["study"])
 VALID_TRACKS = {"mixed", "concept", "lab"}
+POSTGRES_INTEGER_MAX = (1 << 31) - 1
 
 
 def _now_utc() -> datetime:
@@ -51,13 +52,15 @@ def _demo_user_id(demo_session: str | None) -> int:
     """Map one browser-session token to a stable negative demo user id.
 
     Real account ids are positive. Negative ids keep anonymous progress isolated
-    per browser session without creating throwaway account rows.
+    per browser session without creating throwaway account rows. Keep the mapped
+    value inside PostgreSQL's signed INTEGER range because usercard.user_id and
+    review.user_id are INTEGER columns rather than BIGINT columns.
     """
     token = (demo_session or "").strip()[:128]
     if not token:
         return DEMO_USER_ID
-    digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
-    value = int.from_bytes(digest, "big") & ((1 << 63) - 1)
+    digest = hashlib.blake2b(token.encode("utf-8"), digest_size=4).digest()
+    value = int.from_bytes(digest, "big") & POSTGRES_INTEGER_MAX
     return -(value or 1)
 
 
