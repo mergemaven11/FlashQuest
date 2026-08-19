@@ -205,8 +205,8 @@ def test_private_and_invite_rooms_reject_generic_join(client, sqlite_session: Se
             name=f"{visibility} room",
         ).json()
         response = client.post(f"/rooms/{room['id']}/join", headers=headers)
-        assert response.status_code == 403
-        assert "invite" in response.json()["detail"].lower()
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Room not found"
 
 
 def test_private_room_is_not_enumerable_by_non_member(client, sqlite_session: Session):
