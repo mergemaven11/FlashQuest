@@ -291,14 +291,14 @@ export default function Room() {
     }
   }
 
-  const sendRoomEvent = useCallback((type: string, payload: Record<string, unknown> = {}) => {
+  function sendRoomEvent(type: string, payload: Record<string, unknown> = {}) {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       setError("Reconnect to the room before sending realtime actions");
       return;
     }
     socket.send(JSON.stringify({ type, payload }));
-  }, []);
+  }
 
   function sendChat(event: FormEvent) {
     event.preventDefault();
