@@ -38,6 +38,8 @@ export default function Study() {
 
   const [decks, setDecks] = useState<DeckRead[]>([]);
   const [deckId, setDeckId] = useState<number | null>(requestedDeck);
+  const [deckLoading, setDeckLoading] = useState(true);
+  const [deckError, setDeckError] = useState<string | null>(null);
   const [track, setTrack] = useState<StudyTrack>("mixed");
   const [data, setData] = useState<StudyNext | null>(null);
   const [showHint, setShowHint] = useState(false);
@@ -70,13 +72,24 @@ export default function Study() {
     () => decks.find((deck) => deck.id === deckId) ?? null,
     [decks, deckId]
   );
-  const hasMultipleDecks = decks.length > 1;
+  const hasMultipleDecks = !deckLoading && !deckError && decks.length > 1;
 
   const loadDecks = useCallback(async () => {
+    setDeckLoading(true);
+    setDeckError(null);
     try {
       const featured = await getFeaturedDecks();
-      const mine = user ? await getMyDecks() : [];
+      const mine = user ? await getMyDecks().catch(() => [] as DeckRead[]) : [];
       const all = [...featured, ...mine];
+
+      if (all.length === 0) {
+        setDecks([]);
+        setDeckId(null);
+        setData(null);
+        setDeckError("No study decks are available right now.");
+        return;
+      }
+
       setDecks(all);
       setDeckId((current) => {
         const wanted = requestedDeck ?? current;
@@ -84,13 +97,18 @@ export default function Study() {
         return featured[0]?.id ?? mine[0]?.id ?? null;
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load decks");
+      setDecks([]);
+      setDeckId(null);
+      setData(null);
+      setDeckError(e instanceof Error ? e.message : "Could not load decks");
+    } finally {
+      setDeckLoading(false);
     }
   }, [user, requestedDeck]);
 
   const loadNext = useCallback(
     async (clearFeedback = true, excludeIds: number[] = []) => {
-      if (!deckId) return;
+      if (!deckId || deckLoading || deckError) return;
       setLoading(true);
       setError(null);
       if (clearFeedback) setFeedback(null);
@@ -106,7 +124,7 @@ export default function Study() {
         setLoading(false);
       }
     },
-    [deckId, track]
+    [deckId, deckLoading, deckError, track]
   );
 
   useEffect(() => {
@@ -114,11 +132,13 @@ export default function Study() {
   }, [loadDecks]);
 
   useEffect(() => {
+    if (deckLoading || deckError || !deckId) return;
     setSkippedCardIds([]);
     void loadNext();
-  }, [deckId, track, loadNext]);
+  }, [deckId, track, deckLoading, deckError, loadNext]);
 
   function chooseDeck(id: number) {
+    setData(null);
     setDeckId(id);
     setParams({ deck: String(id) }, { replace: true });
   }
@@ -253,7 +273,30 @@ export default function Study() {
       <section className="game-panel grid gap-5 p-5 sm:p-6 lg:grid-cols-[.9fr_1.4fr]">
         <div>
           <p className="metric-label">{hasMultipleDecks ? "Choose a deck" : "Featured deck"}</p>
-          {hasMultipleDecks ? (
+          {deckLoading ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-2 rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-slate-400"
+            >
+              ⏳ Loading deck…
+            </div>
+          ) : deckError ? (
+            <div
+              role="alert"
+              className="mt-2 rounded-xl border border-[#d00000]/45 bg-[#6a040f]/25 px-4 py-4"
+            >
+              <p className="font-black text-rose-100">🛡️ Couldn’t load the deck</p>
+              <p className="mt-1 text-sm leading-6 text-rose-100/75">{deckError}</p>
+              <button
+                type="button"
+                className="game-button mt-3 bg-[#ffba08] px-4 py-2 text-sm font-black text-[#370617]"
+                onClick={() => void loadDecks()}
+              >
+                ↻ Retry deck load
+              </button>
+            </div>
+          ) : hasMultipleDecks ? (
             <select
               id="deck"
               aria-label="Choose a deck"
@@ -280,7 +323,7 @@ export default function Study() {
             </div>
           ) : (
             <div className="mt-2 rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-slate-400">
-              Loading deck…
+              No deck selected.
             </div>
           )}
           <p className="mt-2 text-xs text-slate-500">
@@ -304,6 +347,7 @@ export default function Study() {
                       : "border-white/10 bg-black/15 hover:border-[#f48c06]/40"
                   }`}
                   onClick={() => setTrack(value)}
+                  disabled={deckLoading || Boolean(deckError) || !deckId}
                 >
                   <span className="text-lg">{item.icon}</span>
                   <span className="ml-2 font-black text-white">{item.title}</span>
