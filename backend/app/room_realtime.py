@@ -123,6 +123,22 @@ class RoomConnectionManager:
                 self._connections.pop(room_id, None)
             return True
 
+    async def kick_user(self, room_id: int, user_id: int, code: int = 4403) -> bool:
+        """Immediately detach and close every live socket for one room member."""
+        async with self._lock:
+            room = self._connections.get(room_id)
+            if room is None:
+                return False
+            sockets = list(room.pop(user_id, []))
+            if not room:
+                self._connections.pop(room_id, None)
+        for socket in sockets:
+            try:
+                await socket.close(code=code)
+            except Exception:
+                continue
+        return bool(sockets)
+
     async def online_user_ids(self, room_id: int) -> list[int]:
         async with self._lock:
             return sorted(self._connections.get(room_id, {}).keys())
