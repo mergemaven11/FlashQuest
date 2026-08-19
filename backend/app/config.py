@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     VERIFICATION_TOKEN_MINUTES: int = 60
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Comma-separated account emails allowed to review moderation reports.
+    # This is a server-side privilege bootstrap, not a user-controlled role.
+    MODERATOR_EMAILS: str = ""
+
     # Server-side only. Built-in demo cards cannot be deleted/reset when blank.
     DEMO_DELETE_PASSWORD: str = ""
 

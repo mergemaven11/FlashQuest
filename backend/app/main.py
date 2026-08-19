@@ -15,7 +15,7 @@ from sqlmodel import Session
 
 from .config import settings
 from .db import get_session
-from .routers import activities, auth, cards, decks, room_realtime, rooms, study
+from .routers import activities, auth, cards, decks, moderation, room_realtime, rooms, study
 
 
 def _allowed_origins() -> list[str]:
@@ -76,6 +76,7 @@ app.include_router(study.router)
 app.include_router(activities.router)
 app.include_router(rooms.router)
 app.include_router(room_realtime.router)
+app.include_router(moderation.router)
 
 
 @app.get("/health")
