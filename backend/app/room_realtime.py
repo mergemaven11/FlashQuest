@@ -143,12 +143,20 @@ class RoomConnectionManager:
         async with self._lock:
             return sorted(self._connections.get(room_id, {}).keys())
 
-    async def broadcast(self, room_id: int, event: dict[str, Any]) -> None:
-        """Broadcast best-effort to sockets attached to this process."""
+    async def broadcast(
+        self,
+        room_id: int,
+        event: dict[str, Any],
+        *,
+        exclude_user_ids: set[int] | None = None,
+    ) -> None:
+        """Broadcast best-effort, optionally filtering recipient user ids."""
+        excluded = exclude_user_ids or set()
         async with self._lock:
             sockets = [
                 socket
-                for user_sockets in self._connections.get(room_id, {}).values()
+                for user_id, user_sockets in self._connections.get(room_id, {}).items()
+                if user_id not in excluded
                 for socket in user_sockets
             ]
         for socket in sockets:
