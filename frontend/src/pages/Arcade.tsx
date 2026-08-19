@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import {
-  getLibraryDecks,
-  getMyDecks,
-} from "../api";
-import {
-  sendActivityEvent,
-  startActivity,
-} from "../arcadeApi";
+import { getLibraryDecks, getMyDecks } from "../api";
+import { sendActivityEvent, startActivity } from "../arcadeApi";
 import {
   shouldUseActivityTimer,
   type ActivityPublicState,
@@ -19,6 +13,7 @@ import { useExperience } from "../experienceContext";
 import { useGameFeel } from "../gameFeelContext";
 import type { DeckRead } from "../types";
 
+type PlayableActivityType = Extract<ActivityType, "blitz" | "match" | "sort">;
 type BlitzChoice = { id: string; text: string };
 type BlitzPayload = {
   card_id: number;
@@ -38,9 +33,20 @@ type MatchPayload = {
   choices: BlitzChoice[];
 };
 type MatchMap = Record<string, string>;
+type SortItem = {
+  card_id: number;
+  prompt: string;
+  clue: string;
+};
+type SortPayload = {
+  items: SortItem[];
+  buckets: string[];
+  axis: "domain";
+};
+type SortMap = Record<string, string>;
 
 type GameOption = {
-  type: Extract<ActivityType, "blitz" | "match">;
+  type: PlayableActivityType;
   icon: string;
   title: string;
   detail: string;
@@ -62,6 +68,13 @@ const games: GameOption[] = [
     detail: "Pair prompts with definitions using a keyboard- and touch-friendly board.",
     minCards: 3,
   },
+  {
+    type: "sort",
+    icon: "🗃️",
+    title: "Sort the Stack",
+    detail: "Place cards into their correct learning domains without seeing the answer key.",
+    minCards: 4,
+  },
 ];
 
 function blitzPayload(state: ActivityPublicState): BlitzPayload {
@@ -70,6 +83,10 @@ function blitzPayload(state: ActivityPublicState): BlitzPayload {
 
 function matchPayload(state: ActivityPublicState): MatchPayload {
   return state.payload as unknown as MatchPayload;
+}
+
+function sortPayload(state: ActivityPublicState): SortPayload {
+  return state.payload as unknown as SortPayload;
 }
 
 function participantScore(state: ActivityPublicState | null): number {
@@ -93,6 +110,17 @@ function uniqueDecks(rows: DeckRead[]): DeckRead[] {
   });
 }
 
+function requestedActivity(value: string | null): PlayableActivityType {
+  if (value === "match" || value === "sort") return value;
+  return "blitz";
+}
+
+function nextGameType(current: PlayableActivityType): PlayableActivityType {
+  if (current === "blitz") return "match";
+  if (current === "match") return "sort";
+  return "blitz";
+}
+
 export default function Arcade() {
   const { user } = useAuth();
   const { policy, preferences } = useExperience();
@@ -100,13 +128,14 @@ export default function Arcade() {
   const [params, setParams] = useSearchParams();
 
   const requestedDeck = Number(params.get("deck") || 0) || null;
-  const requestedGame = params.get("game") === "match" ? "match" : "blitz";
+  const requestedGame = requestedActivity(params.get("game"));
 
   const [decks, setDecks] = useState<DeckRead[]>([]);
   const [deckId, setDeckId] = useState<number | null>(requestedDeck);
-  const [gameType, setGameType] = useState<"blitz" | "match">(requestedGame);
+  const [gameType, setGameType] = useState<PlayableActivityType>(requestedGame);
   const [activity, setActivity] = useState<ActivityPublicState | null>(null);
   const [matches, setMatches] = useState<MatchMap>({});
+  const [placements, setPlacements] = useState<SortMap>({});
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -150,6 +179,7 @@ export default function Arcade() {
 
   useEffect(() => {
     setMatches({});
+    setPlacements({});
   }, [activity?.round_index, activity?.session_id]);
 
   const submitResponse = useCallback(
@@ -183,7 +213,7 @@ export default function Arcade() {
       setSecondsLeft(null);
       return;
     }
-    const duration = gameType === "match" ? 45 : 20;
+    const duration = gameType === "blitz" ? 20 : 45;
     let remaining = duration;
     let expired = false;
     setSecondsLeft(remaining);
@@ -195,12 +225,22 @@ export default function Arcade() {
       window.clearInterval(timer);
       if (gameType === "match") {
         void submitResponse({ matches });
+      } else if (gameType === "sort") {
+        void submitResponse({ placements });
       } else {
         void submitResponse({ choice_id: "" });
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [activity, gameType, loading, matches, submitResponse, timerEnabled]);
+  }, [
+    activity,
+    gameType,
+    loading,
+    matches,
+    placements,
+    submitResponse,
+    timerEnabled,
+  ]);
 
   useEffect(() => {
     if (!activity || activity.phase !== "prompt" || gameType !== "blitz") return;
@@ -223,6 +263,7 @@ export default function Arcade() {
     setLoading(true);
     setError(null);
     setMatches({});
+    setPlacements({});
     try {
       const next = await startActivity({
         deck_id: selectedDeck.id,
@@ -267,6 +308,7 @@ export default function Arcade() {
       });
       setActivity(next);
       setMatches({});
+      setPlacements({});
       if (next.phase === "complete") play("complete");
       else play("roundStart");
     } catch (cause) {
@@ -276,10 +318,11 @@ export default function Arcade() {
     }
   }
 
-  function resetGame(nextType?: "blitz" | "match") {
+  function resetGame(nextType?: PlayableActivityType) {
     const resolved = nextType ?? gameType;
     setActivity(null);
     setMatches({});
+    setPlacements({});
     setSecondsLeft(null);
     setGameType(resolved);
     if (deckId) setParams({ deck: String(deckId), game: resolved }, { replace: true });
@@ -340,7 +383,7 @@ export default function Arcade() {
 
           <div>
             <p className="metric-label">2 · Pick a game</p>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {games.map((game) => {
                 const active = gameType === game.type;
                 const enoughCards = (selectedDeck?.card_count ?? 0) >= game.minCards;
@@ -364,6 +407,9 @@ export default function Arcade() {
                     </div>
                     <h2 className="mt-4 text-xl font-black text-white">{game.title}</h2>
                     <p className="mt-2 text-sm leading-6 text-slate-400">{game.detail}</p>
+                    {game.type === "sort" && enoughCards && (
+                      <p className="mt-2 text-xs text-slate-500">Requires at least two domains in the deck.</p>
+                    )}
                   </button>
                 );
               })}
@@ -442,7 +488,7 @@ export default function Arcade() {
               onReveal={() => void revealWithoutScore()}
               onNext={() => void nextRound()}
             />
-          ) : (
+          ) : gameType === "match" ? (
             <MatchBoard
               state={activity}
               matches={matches}
@@ -451,6 +497,18 @@ export default function Arcade() {
                 setMatches((current) => ({ ...current, [String(cardId)]: choiceId }))
               }
               onSubmit={() => void submitResponse({ matches })}
+              onReveal={() => void revealWithoutScore()}
+              onNext={() => void nextRound()}
+            />
+          ) : (
+            <SortBoard
+              state={activity}
+              placements={placements}
+              loading={loading}
+              onPlace={(cardId, domain) =>
+                setPlacements((current) => ({ ...current, [String(cardId)]: domain }))
+              }
+              onSubmit={() => void submitResponse({ placements })}
               onReveal={() => void revealWithoutScore()}
               onNext={() => void nextRound()}
             />
@@ -477,7 +535,7 @@ export default function Arcade() {
               </button>
               <button
                 className="game-button border border-cyan-300/25 bg-cyan-300/[0.08] px-5 py-3 font-black text-cyan-100"
-                onClick={() => resetGame(gameType === "blitz" ? "match" : "blitz")}
+                onClick={() => resetGame(nextGameType(gameType))}
               >
                 🎲 Switch game
               </button>
@@ -680,6 +738,122 @@ function MatchBoard({
                 onClick={onReveal}
               >
                 👀 Reveal board
+              </button>
+            </>
+          ) : (
+            <button
+              className="game-button bg-[#ffba08] px-6 py-3 font-black text-[#370617]"
+              disabled={loading}
+              onClick={onNext}
+            >
+              Finish quest →
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SortBoard({
+  state,
+  placements,
+  loading,
+  onPlace,
+  onSubmit,
+  onReveal,
+  onNext,
+}: {
+  state: ActivityPublicState;
+  placements: SortMap;
+  loading: boolean;
+  onPlace: (cardId: number, domain: string) => void;
+  onSubmit: () => void;
+  onReveal: () => void;
+  onNext: () => void;
+}) {
+  const payload = sortPayload(state);
+  const result = resultRecord(state);
+  const answerMap = (state.reveal?.answer_map ?? {}) as Record<string, string>;
+  const showResult = state.phase === "result" || state.phase === "reveal";
+  const completeBoard = payload.items.every((item) => Boolean(placements[String(item.card_id)]));
+
+  return (
+    <section className="quest-card p-5 sm:p-8">
+      <div className="relative z-10">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="game-chip px-3 py-1.5 text-xs font-black text-[#ffba08]">🗃️ SORT THE STACK</span>
+          <span className="game-chip px-3 py-1.5 text-xs font-black text-slate-300">{payload.items.length} cards · {payload.buckets.length} domains</span>
+        </div>
+        <h2 className="mt-6 text-2xl font-black text-white sm:text-3xl">Which domain does each card belong to?</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-400">
+          The domain is intentionally hidden from each card until reveal. Use the term and definition as your clue; drag-and-drop is optional, not required.
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-2" aria-label="Available domains">
+          {payload.buckets.map((bucket) => (
+            <span key={bucket} className="game-chip px-3 py-1.5 text-xs font-black text-cyan-100">📚 {bucket}</span>
+          ))}
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          {payload.items.map((item, index) => {
+            const selected = placements[String(item.card_id)] ?? "";
+            const correctDomain = answerMap[String(item.card_id)] ?? "";
+            const correct = showResult && selected === correctDomain;
+            return (
+              <div key={item.card_id} className="game-panel p-4">
+                <p className="metric-label">Card {index + 1}</p>
+                <h3 className="mt-2 text-lg font-black text-white">{item.prompt}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{item.clue}</p>
+                <label className="mt-4 block text-xs font-black text-slate-300" htmlFor={`sort-${item.card_id}`}>Place in domain</label>
+                <select
+                  id={`sort-${item.card_id}`}
+                  className="game-input mt-1.5"
+                  disabled={loading || showResult}
+                  value={selected}
+                  onChange={(event) => onPlace(item.card_id, event.target.value)}
+                >
+                  <option value="">Choose a domain…</option>
+                  {payload.buckets.map((bucket) => <option key={bucket} value={bucket}>{bucket}</option>)}
+                </select>
+                {showResult && (
+                  <div className="mt-2 text-xs leading-5">
+                    <strong className={correct ? "text-emerald-200" : "text-rose-200"}>{correct ? "✓ Correct bucket" : "✕ Different bucket"}</strong>
+                    <span className="ml-2 text-slate-400">Correct: {correctDomain || "—"}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {showResult && (
+          <div className="answer-pop mt-5 rounded-2xl border border-cyan-300/25 bg-cyan-300/[0.08] p-5">
+            <p className="font-black text-white">
+              {state.phase === "result"
+                ? `🗃️ ${Number(result.correct_count ?? 0)}/${Number(result.total ?? payload.items.length)} sorted · +${Number(result.points ?? 0)} Arcade points`
+                : "👀 Stack revealed — no Arcade points awarded."}
+            </p>
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          {!showResult ? (
+            <>
+              <button
+                className="game-button bg-[#ffba08] px-6 py-3 font-black text-[#370617]"
+                disabled={loading || !completeBoard}
+                onClick={onSubmit}
+              >
+                Check my stack
+              </button>
+              <button
+                className="game-button border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-black text-white"
+                disabled={loading}
+                onClick={onReveal}
+              >
+                👀 Reveal stack
               </button>
             </>
           ) : (
