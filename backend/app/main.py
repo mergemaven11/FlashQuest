@@ -15,7 +15,16 @@ from sqlmodel import Session
 
 from .config import settings
 from .db import get_session
-from .routers import activities, auth, cards, decks, moderation, room_realtime, rooms, study
+from .routers import (
+    activities,
+    auth,
+    cards,
+    decks,
+    moderation,
+    room_realtime,
+    rooms,
+    study,
+)
 
 
 def _allowed_origins() -> list[str]:

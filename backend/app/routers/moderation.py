@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlmodel import Session, delete, select
 
 from ..config import settings
@@ -21,7 +20,7 @@ from ..moderation_models import (
     ReportReview,
     UserBlock,
 )
-from ..room_models import RoomMember, RoomMessage, StudyRoom
+from ..room_models import RoomMember, RoomMessage
 from ..security import get_current_user
 from .rooms import _active_member, _room_or_404
 
@@ -252,12 +251,17 @@ def block_user(
     )
 
 
-@router.delete("/blocks/{target_user_id}", status_code=204)
+@router.delete(
+    "/blocks/{target_user_id}",
+    status_code=204,
+    response_model=None,
+    response_class=Response,
+)
 def unblock_user(
     target_user_id: int,
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> None:
+) -> Response:
     session.exec(
         delete(UserBlock).where(
             UserBlock.blocker_user_id == int(user.id or 0),
@@ -265,6 +269,7 @@ def unblock_user(
         )
     )
     session.commit()
+    return Response(status_code=204)
 
 
 @router.get("/blocks", response_model=list[BlockRead])
