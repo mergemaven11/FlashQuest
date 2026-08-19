@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import func
 from sqlmodel import Session, delete, select
 
 from ..config import settings
@@ -21,7 +20,7 @@ from ..moderation_models import (
     ReportReview,
     UserBlock,
 )
-from ..room_models import RoomMember, RoomMessage, StudyRoom
+from ..room_models import RoomMember, RoomMessage
 from ..security import get_current_user
 from .rooms import _active_member, _room_or_404
 
