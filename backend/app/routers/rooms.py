@@ -145,7 +145,6 @@ def _deck_for_room(
     if not owns_deck and not shareable:
         raise HTTPException(status_code=403, detail="You cannot create a room for this deck")
 
-    # A room must never widen the discoverability of its backing deck.
     if room_visibility == "public" and not (deck.is_builtin or deck.visibility == "public"):
         raise HTTPException(
             status_code=422,
@@ -320,7 +319,6 @@ def room_detail(
     room = _room_or_404(session, room_id)
     member = _active_member(session, room_id, int(user.id or 0))
     if member is None and not (room.visibility == "public" and room.status == "open"):
-        # Hide private/invite-only room existence from non-members.
         raise HTTPException(status_code=404, detail="Room not found")
     return _read_room(session, room, int(user.id or 0))
 
@@ -331,21 +329,23 @@ def join_room(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> RoomRead:
-    """Join an open public room. Invite/private membership is handled separately."""
+    """Join an open public room; hidden room ids remain non-enumerable."""
     room = _room_or_404(session, room_id)
-    if room.status != "open":
-        raise HTTPException(status_code=409, detail="Room is closed")
-
     user_id = int(user.id or 0)
     current = _active_member(session, room_id, user_id)
     if current is not None:
         return _read_room(session, room, user_id)
 
+    if room.visibility != "public":
+        raise HTTPException(status_code=404, detail="Room not found")
+    if room.status != "open":
+        raise HTTPException(status_code=409, detail="Room is closed")
+
     prior = _any_membership(session, room_id, user_id)
     if prior is not None:
         if prior.status == "removed":
             raise HTTPException(status_code=403, detail="Membership was removed")
-        if prior.status == "left" and room.visibility == "public":
+        if prior.status == "left":
             _activate_membership(
                 session,
                 room,
@@ -356,9 +356,6 @@ def join_room(
             session.add(room)
             session.commit()
             return _read_room(session, room, user_id)
-
-    if room.visibility != "public":
-        raise HTTPException(status_code=403, detail="Invite or membership required")
 
     _activate_membership(
         session,
