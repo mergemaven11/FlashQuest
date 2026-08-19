@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.models import Card, Deck, UserCard
+from app.routers.study import POSTGRES_INTEGER_MAX, _demo_user_id
 from app.security import DEMO_USER_ID
 
 
@@ -53,6 +54,37 @@ def _mk_card(
     session.add(UserCard(user_id=DEMO_USER_ID, card_id=int(card.id or 0), bin=0))
     session.commit()
     return card
+
+
+def test_demo_session_ids_fit_postgres_integer_range() -> None:
+    first = _demo_user_id("browser-session-a")
+    second = _demo_user_id("browser-session-b")
+
+    assert -POSTGRES_INTEGER_MAX <= first <= -1
+    assert -POSTGRES_INTEGER_MAX <= second <= -1
+    assert first == _demo_user_id("browser-session-a")
+    assert first != second
+
+
+def test_demo_session_header_creates_safe_progress_id(
+    client: TestClient, sqlite_session: Session
+) -> None:
+    card = _mk_card(sqlite_session, "session-safe", "safe")
+    token = "browser-session-a"
+    expected_user_id = _demo_user_id(token)
+
+    response = client.get("/study/next", headers={"X-Demo-Session": token})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert -POSTGRES_INTEGER_MAX <= expected_user_id <= -1
+    progress = sqlite_session.exec(
+        select(UserCard).where(
+            UserCard.user_id == expected_user_id,
+            cast(Any, UserCard.card_id) == card.id,
+        )
+    ).first()
+    assert progress is not None
 
 
 def test_next_returns_new_when_nothing_due(
