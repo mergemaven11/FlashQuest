@@ -21,6 +21,7 @@ export default function RoomInvite() {
   const location = useLocation();
   const navigate = useNavigate();
   const [token] = useState(() => initialInviteToken(location.search));
+  const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
 
@@ -36,7 +37,7 @@ export default function RoomInvite() {
   }, [location.search, navigate]);
 
   useEffect(() => {
-    if (!user || !token || joining) return;
+    if (!user || !token) return;
     let cancelled = false;
     setJoining(true);
     setError(null);
@@ -59,7 +60,7 @@ export default function RoomInvite() {
     return () => {
       cancelled = true;
     };
-  }, [joining, navigate, token, user]);
+  }, [attempt, navigate, token, user]);
 
   if (!token) {
     return (
@@ -112,7 +113,8 @@ export default function RoomInvite() {
           <button
             type="button"
             className="game-button bg-[#ffba08] px-4 py-2 font-black text-[#370617]"
-            onClick={() => setJoining(false)}
+            disabled={joining}
+            onClick={() => setAttempt((value) => value + 1)}
           >
             Try again
           </button>
