@@ -12,7 +12,7 @@ Quest Rooms are **deck-linked study session containers**. Chat, card sharing, pr
 | Presence and connection counts | Ephemeral realtime process | Heartbeats should not write to the database continuously |
 | Shared Arcade runtime | Realtime host, with phase-safe snapshots | Uses the same activity contract as solo Arcade |
 
-The first realtime implementation may keep presence and active room runtime in memory while FlashQuest runs a single realtime instance. Before horizontal scale, a shared pub/sub layer is required so participants connected to different instances receive the same events.
+The first realtime implementation keeps presence in memory while FlashQuest runs a single realtime instance. Before horizontal scale, a shared pub/sub layer is required so participants connected to different instances receive the same events.
 
 ## Persistent models
 
@@ -72,46 +72,60 @@ Only the host closes a room in the foundation. Closed rooms preserve membership/
 
 Browser WebSocket APIs should not receive long-lived account bearer tokens in query strings.
 
-The planned connection flow is:
+The implemented connection flow is:
 
-1. Authenticated HTTP client requests `POST /rooms/{id}/ws-ticket`.
-2. Server validates membership/access and returns a short-lived, one-use opaque ticket.
+1. Authenticated active room member requests `POST /rooms/{id}/ws-ticket`.
+2. Server returns a **45-second, one-use opaque ticket**.
 3. Browser opens `WS /rooms/{id}/ws?ticket=...`.
-4. Server consumes the ticket and binds the socket to the resolved room member.
+4. Server atomically consumes the ticket, revalidates room/membership, and binds the socket to that user.
 
-Tickets should expire in roughly 30–60 seconds and are capabilities for one connection attempt, not replacement login sessions.
+The raw ticket is never stored persistently. Reuse, expiry, or room mismatch fails. The ticket is a capability for one connection attempt, not a replacement login session.
 
-## Presence and reconnects
+## Presence, chat, and reconnects
 
-Presence is an in-memory connection registry keyed by room/user connection ids.
+Presence is an in-memory connection registry keyed by room and user, while chat messages are persisted before broadcast.
 
 - Multiple tabs may create multiple live connections for one member.
-- The member remains online until the final live connection closes or expires.
-- Heartbeats update ephemeral connection expiry.
-- `RoomMember.last_seen_at` may be updated opportunistically, not on every ping.
-- Reconnect loads persistent membership/history and the current phase-safe activity snapshot.
+- `presence.joined` is emitted only for the first live connection for that user.
+- `presence.left` is emitted only after the final live connection closes.
+- Reconnect requests a fresh one-use ticket and receives a `room.snapshot` containing current presence plus the latest durable messages.
+- `RoomMember.last_seen_at` is updated opportunistically rather than on every network event.
+- Every chat mutation re-checks durable room membership, so a user removed while connected cannot keep posting with an old socket.
+- Chat messages are capped at 1,000 characters and have a basic per-user/per-room burst limit.
+- `GET /rooms/{id}/messages` provides durable member-only history independently of the WebSocket connection.
+
+The current connection manager is intentionally single-process. Cross-instance broadcasts require shared pub/sub before running multiple realtime instances.
 
 ## Realtime event envelope
 
-Quest Rooms will use one versioned envelope for chat, presence, and games. Planned event types include:
+Quest Rooms use the versioned `quest-room.v1` envelope with room id, event type, server timestamp, and event-specific payload.
 
+Implemented chat/presence events include:
+
+- `room.snapshot`
 - `presence.joined`
 - `presence.left`
 - `message.created`
+- `pong`
+- `error`
+
+Planned shared-study events include:
+
 - `card.shared`
 - `room.updated`
 - `activity.started`
 - `activity.state`
 - `activity.completed`
-- `error`
 
 Every mutation is authorized server-side regardless of what controls the client displays.
 
 ## Shared Arcade contract
 
-Room games do **not** get a second multiplayer game engine. Quest Rooms host the same `ActivityRuntime` used by solo Arcade and broadcast only `ActivityPublicState`.
+Room games do **not** get a second multiplayer game engine. Quest Rooms will host the same `ActivityRuntime` used by solo Arcade and broadcast only `ActivityPublicState`.
 
 Correct answer ids/maps stay server-internal until synchronized reveal. Room/team score remains separate from each learner's spaced-repetition mastery. Future mastery updates go through the dedicated per-card progress adapter rather than mutating bins from room UI state.
+
+Room-hosted Arcade synchronization remains a follow-on slice; the current realtime implementation covers chat, presence, durable history, and secure connection tickets.
 
 ## Moderation launch gate
 
@@ -124,4 +138,4 @@ Before broad public-room discovery ships, the realtime/message layer must includ
 - permission-checked message/card posting
 - report/block/ban support from the moderation workstream
 
-This foundation intentionally ships persistence and permissions before public social discovery.
+The first two controls and membership-checked chat posting exist in the realtime foundation. Broad public-room discovery remains blocked until the remaining moderation/reporting controls are implemented.

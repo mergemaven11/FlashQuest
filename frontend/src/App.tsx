@@ -3,12 +3,15 @@ import { AuthProvider, useAuth } from "./auth";
 import { ExperienceProvider } from "./experience";
 import { GameFeelProvider, SoundToggle } from "./gameFeel";
 import Admin from "./pages/Admin";
+import Arcade from "./pages/Arcade";
 import Landing from "./pages/Landing";
 import Library from "./pages/Library";
 import LibraryDeck from "./pages/LibraryDeck";
 import Login from "./pages/Login";
 import MyDecks from "./pages/MyDecks";
 import Preferences from "./pages/Preferences";
+import Room from "./pages/Room";
+import Rooms from "./pages/Rooms";
 import Signup from "./pages/Signup";
 import Status from "./pages/Status";
 import Study from "./pages/Study";
@@ -21,7 +24,9 @@ function Shell() {
   const location = useLocation();
   const navItems = [
     { to: "/study", icon: "⚡", label: "Play" },
+    { to: "/arcade", icon: "🎮", label: "Arcade" },
     { to: "/library", icon: "📚", label: "Library" },
+    ...(user ? [{ to: "/rooms", icon: "👥", label: "Rooms" }] : []),
     { to: "/deck-lab", icon: "🧪", label: "Deck Lab" },
     ...(user ? [{ to: "/decks", icon: "🗂️", label: "My Decks" }] : []),
     { to: "/status", icon: "🗺️", label: "Deck Map" },
@@ -75,8 +80,11 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/study" element={<Study />} />
+          <Route path="/arcade" element={<Arcade />} />
           <Route path="/library" element={<Library />} />
           <Route path="/library/:slug" element={<LibraryDeck />} />
+          <Route path="/rooms" element={<Rooms />} />
+          <Route path="/rooms/:roomId" element={<Room />} />
           <Route path="/deck-lab" element={<Admin />} />
           <Route path="/admin" element={<Navigate to="/deck-lab" replace />} />
           <Route path="/decks" element={<MyDecks />} />
@@ -90,7 +98,7 @@ function Shell() {
       </main>
 
       <footer className="relative z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500">
-        <span>Library · community decks · Arcade foundation · adaptable learning modes</span>
+        <span>Library · community decks · Arcade · Quest Rooms · adaptable learning modes</span>
         <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">FastAPI · React · PostgreSQL · Docker · Docs ↗</a>
       </footer>
     </div>
