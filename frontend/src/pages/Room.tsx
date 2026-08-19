@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import RoomAccessPanel from "../components/RoomAccessPanel";
 import RoomArcadePanel, {
   type RoomActivitySnapshot,
 } from "../components/RoomArcadePanel";
@@ -200,17 +201,20 @@ export default function Room() {
           setError("Realtime connection hit a network error");
         }
       };
-      socket.onclose = () => {
+      socket.onclose = (closeEvent) => {
         if (socketRef.current === socket) {
           socketRef.current = null;
           setConnection("offline");
+          if (closeEvent.code === 4403) {
+            navigate("/rooms", { replace: true });
+          }
         }
       };
     } catch (cause) {
       setConnection("offline");
       setError(cause instanceof Error ? cause.message : "Could not connect to realtime room");
     }
-  }, [handleRealtimeEvent, room, roomId, user]);
+  }, [handleRealtimeEvent, navigate, room, roomId, user]);
 
   useEffect(() => {
     if (room?.current_user_role && room.status === "open") {
@@ -350,9 +354,11 @@ export default function Room() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void copyRoomLink()} className="game-button game-chip px-3 py-2 text-xs font-black text-slate-200">
-              {copied ? "✅ Copied" : "🔗 Copy room link"}
-            </button>
+            {room.visibility === "public" && (
+              <button type="button" onClick={() => void copyRoomLink()} className="game-button game-chip px-3 py-2 text-xs font-black text-slate-200">
+                {copied ? "✅ Copied" : "🔗 Copy public room link"}
+              </button>
+            )}
             <Link to={`/study?deck=${room.deck_id}`} className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white">
               ⚡ Study deck
             </Link>
@@ -374,7 +380,7 @@ export default function Room() {
           <div className="text-4xl">🚪</div>
           <h2 className="mt-3 text-2xl font-black text-white">You found a public Quest Room</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
-            Join to receive live presence and chat. Membership is persistent; disconnecting your browser does not create or remove membership rows.
+            Join to receive live presence, chat, and room Arcade. Membership is persistent; disconnecting your browser does not create or remove membership rows.
           </p>
           <button
             type="button"
@@ -398,7 +404,7 @@ export default function Room() {
             onSend={sendRoomEvent}
           />
 
-          <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="game-panel flex min-h-[520px] flex-col overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
                 <div>
@@ -479,6 +485,12 @@ export default function Room() {
                 </div>
               </section>
 
+              <RoomAccessPanel
+                room={room}
+                currentUserId={user.id}
+                onMembershipChanged={() => void loadRoom()}
+              />
+
               <section className="game-panel p-4">
                 <p className="metric-label">Room controls</p>
                 <p className="mt-2 text-sm text-slate-400">Role: <strong className="text-slate-200">{room.current_user_role}</strong></p>
@@ -504,7 +516,7 @@ export default function Room() {
               </section>
 
               <p className="px-2 text-xs leading-5 text-slate-600">
-                Presence and active Arcade runtime are realtime process state; membership and messages stay durable in PostgreSQL.
+                Presence and active Arcade runtime are realtime process state; room membership, invites, and messages stay durable in PostgreSQL.
               </p>
             </aside>
           </section>

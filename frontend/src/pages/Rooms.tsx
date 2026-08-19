@@ -158,7 +158,7 @@ export default function Rooms() {
           Study together. <span className="ember-text">Same deck, same room.</span>
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
-          Rooms are deck-linked spaces for live chat and presence. Public rooms are joinable by shared link or room number; FlashQuest is not publishing a global room directory yet.
+          Rooms are deck-linked spaces for live chat, presence, and multiplayer Arcade. Public rooms use a shared room link/number; invite-only rooms use expiring secret links; private rooms admit specific accounts.
         </p>
       </section>
 
@@ -210,12 +210,19 @@ export default function Rooms() {
             value={visibility}
             onChange={(event) => setVisibility(event.target.value as RoomVisibility)}
           >
-            <option value="private">Private · host only for now</option>
-            <option value="invite_only">Invite only · invite UX arrives next</option>
+            <option value="private">Private · host adds specific accounts</option>
+            <option value="invite_only">Invite only · share an expiring secret link</option>
             <option value="public" disabled={!canPublic}>
               Public by link/ID · signed-in learners can join
             </option>
           </select>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            {visibility === "private"
+              ? "After creation, add verified FlashQuest accounts by email from the room's access controls."
+              : visibility === "invite_only"
+                ? "After creation, generate a 24-hour, 3-day, or 7-day invite link. You can revoke it whenever you want."
+                : "Public rooms remain link/ID based until broad room discovery ships with moderation controls."}
+          </p>
           {!canPublic && selectedDeck && (
             <p className="mt-2 text-xs leading-5 text-slate-500">
               This deck is {selectedDeck.visibility}; FlashQuest will not widen it through a public room.
@@ -232,13 +239,13 @@ export default function Rooms() {
         </form>
 
         <form className="game-panel p-5 sm:p-6" onSubmit={submitJoin}>
-          <p className="metric-label">Join a shared room</p>
+          <p className="metric-label">Join a public room</p>
           <h2 className="mt-2 text-2xl font-black text-white">Got a room number?</h2>
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            Public rooms are intentionally link/ID based in this phase. Private and invite-only rooms do not become enumerable just because you know a nearby number.
+            This box is only for public rooms. Invite-only links go through their secret invite URL, and private rooms require the host to add your account first.
           </p>
           <label className="mt-5 block text-sm font-black text-slate-200" htmlFor="join-room-id">
-            Room number
+            Public room number
           </label>
           <input
             id="join-room-id"
@@ -253,7 +260,7 @@ export default function Rooms() {
             disabled={loading || !joinId}
             className="game-button mt-5 border border-[#faa307]/30 bg-[#370617]/70 px-5 py-3 font-black text-[#ffba08]"
           >
-            🔗 Open shared room
+            🔗 Open public room
           </button>
         </form>
       </section>
@@ -271,7 +278,7 @@ export default function Rooms() {
 
         {rooms.length === 0 ? (
           <div className="game-panel mt-4 p-7 text-center text-slate-400">
-            No rooms yet. Create one above, or open a room number somebody shared with you.
+            No rooms yet. Create one above, join a public room, or open an invite link somebody shared with you.
           </div>
         ) : (
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

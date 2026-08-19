@@ -1,8 +1,8 @@
 """Persistent data contracts for deck-linked Quest Rooms.
 
-Room membership and message history are durable PostgreSQL state. Realtime
-presence intentionally lives outside these tables so heartbeats do not become a
-write-amplification problem.
+Room membership, invite capabilities, and message history are durable PostgreSQL
+state. Realtime presence intentionally lives outside these tables so heartbeats
+do not become a write-amplification problem.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Optional
 
 import sqlalchemy as sa
+from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
 from .models import utc_now
@@ -80,6 +81,29 @@ class RoomMember(SQLModel, table=True):
     removed_at: Optional[datetime] = Field(default=None, sa_type=sa.DateTime(timezone=True))
 
 
+class RoomInvite(SQLModel, table=True):
+    """Hashed reusable invite capability for an invite-only Quest Room."""
+
+    __tablename__ = "room_invite"
+    __table_args__ = (
+        sa.UniqueConstraint("token_hash", name="uq_room_invite_token_hash"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    room_id: int = Field(
+        foreign_key="study_room.id", index=True, sa_type=sa.Integer
+    )
+    created_by_user_id: int = Field(
+        foreign_key="app_user.id", index=True, sa_type=sa.Integer
+    )
+    token_hash: str = Field(index=True, sa_type=sa.String)
+    expires_at: datetime = Field(index=True, sa_type=sa.DateTime(timezone=True))
+    created_at: datetime = Field(default_factory=utc_now, sa_type=sa.DateTime(timezone=True))
+    revoked_at: Optional[datetime] = Field(default=None, sa_type=sa.DateTime(timezone=True))
+    use_count: int = Field(default=0, sa_type=sa.Integer)
+    last_used_at: Optional[datetime] = Field(default=None, sa_type=sa.DateTime(timezone=True))
+
+
 class RoomMessage(SQLModel, table=True):
     """Durable room history independent of any one realtime process."""
 
@@ -141,6 +165,39 @@ class RoomMemberRead(SQLModel):
     status: str
     joined_at: datetime
     last_seen_at: datetime
+    display_name: Optional[str] = None
+
+
+class RoomInviteCreate(SQLModel):
+    """Host request for a reusable invite with bounded lifetime."""
+
+    expires_in_hours: int = Field(default=24, ge=1, le=168)
+
+
+class RoomInviteRead(SQLModel):
+    id: int
+    room_id: int
+    created_by_user_id: int
+    expires_at: datetime
+    created_at: datetime
+    revoked_at: Optional[datetime] = None
+    use_count: int = 0
+    last_used_at: Optional[datetime] = None
+    active: bool
+
+
+class RoomInviteIssued(RoomInviteRead):
+    """Invite metadata plus the raw token returned exactly once at creation."""
+
+    token: str
+
+
+class InviteJoinRequest(SQLModel):
+    token: str
+
+
+class PrivateMemberAddRequest(SQLModel):
+    email: EmailStr
 
 
 class RoomMessageRead(SQLModel):

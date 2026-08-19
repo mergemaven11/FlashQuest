@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import MyDecks from "./pages/MyDecks";
 import Preferences from "./pages/Preferences";
 import Room from "./pages/Room";
+import RoomInvite from "./pages/RoomInvite";
 import Rooms from "./pages/Rooms";
 import Signup from "./pages/Signup";
 import Status from "./pages/Status";
@@ -84,6 +85,7 @@ function Shell() {
           <Route path="/library" element={<Library />} />
           <Route path="/library/:slug" element={<LibraryDeck />} />
           <Route path="/rooms" element={<Rooms />} />
+          <Route path="/rooms/invite" element={<RoomInvite />} />
           <Route path="/rooms/:roomId" element={<Room />} />
           <Route path="/deck-lab" element={<Admin />} />
           <Route path="/admin" element={<Navigate to="/deck-lab" replace />} />
