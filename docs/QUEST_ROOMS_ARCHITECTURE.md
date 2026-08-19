@@ -1,6 +1,6 @@
 # Quest Rooms architecture
 
-Quest Rooms are **deck-linked study session containers**. Chat, card sharing, presence, and synchronized Arcade activities all live inside the same room boundary rather than becoming separate social systems.
+Quest Rooms are **deck-linked study session containers**. Chat, card sharing, presence, synchronized Arcade activities, and access control all live inside the same room boundary rather than becoming separate social systems.
 
 ## State boundaries
 
@@ -8,6 +8,7 @@ Quest Rooms are **deck-linked study session containers**. Chat, card sharing, pr
 | --- | --- | --- |
 | Room identity, host, deck, visibility, status | PostgreSQL | Must survive deploys/restarts |
 | Membership and roles | PostgreSQL | Permissions cannot depend on a socket being connected |
+| Invite token hashes + lifecycle metadata | PostgreSQL | Invite expiry/revocation must survive restarts without storing raw secrets |
 | Message/card-share history | PostgreSQL | Reconnect/history must be durable |
 | Presence and connection counts | Ephemeral realtime process | Heartbeats should not write to the database continuously |
 | Shared Arcade runtime + unrevealed submissions | Ephemeral realtime process | Uses the same activity contract as solo Arcade without persisting answer-bearing round state |
@@ -38,6 +39,18 @@ Membership is durable permission state, not connection state.
 
 A reconnect or second browser tab does not create a second membership row.
 
+### `RoomInvite`
+
+Invite-only admission uses durable metadata with a one-way token hash.
+
+- `room_id`
+- `created_by_user_id`
+- SHA-256 `token_hash`
+- creation/expiry/revocation timestamps
+- use count and last-used timestamp
+
+The raw invite token is returned exactly once at creation and is never returned by invite-list APIs.
+
 ### `RoomMessage`
 
 Messages are durable history with room/user attribution.
@@ -58,15 +71,46 @@ A room must never widen the discoverability of its backing deck.
 - Private decks may only be used by their owner and may not back public rooms.
 - Server-side checks enforce these rules; the UI is not the security boundary.
 
-There is intentionally no public room-discovery endpoint in the foundation. Broad public-room discovery remains blocked until moderation/reporting work is ready.
+There is intentionally no broad public room-discovery endpoint yet. Public rooms are reachable through a shared room link/number until moderation/reporting work is ready.
 
-## Membership lifecycle
+## Room access modes
+
+The three visibility modes have deliberately different admission semantics.
+
+### Public
+
+Any signed-in learner with the shared room link/number may join an open public room. A voluntarily-left public member may rejoin; a member marked `removed` cannot self-rejoin.
+
+### Invite only
+
+Invite-only rooms are non-enumerable to non-members. Generic `GET /rooms/{id}` and `POST /rooms/{id}/join` requests return `404`.
+
+Only the host may issue expiring reusable invite capabilities. The server stores only the token hash. A valid, unexpired, unrevoked token may admit authenticated users until the host revokes it or it expires. Revocation blocks future admission but does not eject learners who already became members.
+
+A removed member cannot use an otherwise-valid invite to restore themselves.
+
+### Private
+
+Private rooms are also non-enumerable to non-members and do not use generic invite links. The host explicitly admits an existing verified FlashQuest account by email. That durable membership then allows the account to open the hidden room normally.
+
+An explicit host add may restore a previously removed account; this is a new host decision rather than self-service re-entry.
+
+See [Quest Room access modes](QUEST_ROOM_ACCESS.md) for the user-facing and security contract.
+
+## Membership lifecycle and live revocation
 
 Verified accounts may create rooms. The creator becomes the persistent `host` member in the same transaction.
 
-Authenticated accounts may join open public rooms. Generic join does not bypass private/invite-only membership. A member who voluntarily left a public room may rejoin; a member marked `removed` cannot self-rejoin.
+Only the host closes a room. Closed rooms preserve membership/history but reject new joins and realtime tickets.
 
-Only the host closes a room in the foundation. Closed rooms preserve membership/history but reject new joins.
+Host removal is both durable and live:
+
+1. The member row becomes `removed`.
+2. Every active socket for that `(room, user)` is detached and closed with `4403`.
+3. Remaining participants receive an updated `presence.left` event.
+4. New WebSocket tickets and room mutations are denied.
+
+This prevents removed learners from continuing to receive realtime room events merely because a socket was already open.
 
 ## Realtime authentication
 
@@ -87,7 +131,7 @@ Presence is an in-memory connection registry keyed by room and user, while chat 
 
 - Multiple tabs may create multiple live connections for one member.
 - `presence.joined` is emitted only for the first live connection for that user.
-- `presence.left` is emitted only after the final live connection closes.
+- `presence.left` is emitted only after the final live connection closes, except host removal explicitly broadcasts revocation state after kicking all target sockets.
 - Reconnect requests a fresh one-use ticket and receives a `room.snapshot` containing current presence, the latest durable messages, and the current phase-safe Arcade snapshot when a game is active.
 - `RoomMember.last_seen_at` is updated opportunistically rather than on every network event.
 - Every chat/game mutation re-checks durable room membership, so a user removed while connected cannot keep posting or playing with an old socket.
@@ -137,7 +181,7 @@ Sort the Stack uses the card's domain as its hidden answer. A compatible Sort de
 
 Correct answer ids/maps stay server-internal until synchronized reveal. Room Arcade score remains separate from each learner's spaced-repetition mastery. Future mastery updates go through the dedicated per-card progress adapter rather than mutating bins from room UI state.
 
-The active room activity is intentionally ephemeral in this phase. A realtime process restart may end an in-progress room game even though the room, membership, and chat history remain durable.
+The active room activity is intentionally ephemeral in this phase. A realtime process restart may end an in-progress room game even though the room, membership, invites, and chat history remain durable.
 
 ## Moderation launch gate
 
@@ -150,4 +194,4 @@ Before broad public-room discovery ships, the realtime/message layer must includ
 - permission-checked message/card posting
 - report/block/ban support from the moderation workstream
 
-The first two controls and membership-checked chat/game mutations exist in the realtime foundation. Broad public-room discovery remains blocked until the remaining moderation/reporting controls are implemented.
+Length/rate limits, host removal, room close, and membership-checked chat/game mutations exist. Broad public-room discovery remains blocked until report/block/ban support and the remaining moderation UX are implemented.
