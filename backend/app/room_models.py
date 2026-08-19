@@ -20,7 +20,7 @@ ROOM_VISIBILITIES = {"public", "private", "invite_only"}
 ROOM_STATUSES = {"open", "closed"}
 ROOM_ROLES = {"host", "moderator", "member"}
 ROOM_MEMBER_STATUSES = {"active", "left", "removed"}
-ROOM_MESSAGE_KINDS = {"chat", "card", "system", "activity"}
+ROOM_MESSAGE_KINDS = {"chat", "card", "hint", "system", "activity"}
 
 
 class StudyRoom(SQLModel, table=True):
@@ -110,7 +110,7 @@ class RoomMessage(SQLModel, table=True):
     __tablename__ = "room_message"
     __table_args__ = (
         sa.CheckConstraint(
-            "kind IN ('chat', 'card', 'system', 'activity')",
+            "kind IN ('chat', 'card', 'hint', 'system', 'activity')",
             name="ck_room_message_kind",
         ),
     )
