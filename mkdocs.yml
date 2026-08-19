@@ -74,6 +74,7 @@ nav:
   - Engineering:
       - Architecture & Design: PLATFORM_ENGINEERING.md
       - Arcade Activity Contract: ARCADE_ACTIVITY_CONTRACT.md
+      - Quest Rooms Architecture: QUEST_ROOMS_ARCHITECTURE.md
       - Operations & Deployment: OPERATIONS.md
   - Reference:
       - Backend API: backend/api.md
