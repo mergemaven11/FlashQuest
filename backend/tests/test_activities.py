@@ -153,6 +153,112 @@ def test_match_quest_uses_same_phase_safe_runtime_contract():
     assert len(reveal_state.reveal["answer_map"]) == 5
 
 
+def test_sort_stack_hides_domain_answer_map_until_reveal():
+    runtime = build_activity_runtime(
+        activity_type=ActivityType.SORT,
+        deck_id=91,
+        cards=_cards(8),
+        mode=ActivityMode.ROOM,
+        seed=321,
+        round_count=6,
+    )
+    state = public_activity_state(runtime)
+    serialized = json.dumps(state.model_dump())
+
+    assert state.definition.type == ActivityType.SORT
+    assert state.total_rounds == 1
+    assert len(state.payload["items"]) == 6
+    assert len(state.payload["buckets"]) == 2
+    assert state.payload["axis"] == "domain"
+    assert state.reveal is None
+    assert "answer_map" not in serialized
+    # Domain is the answer in this activity, so it must not ride inside an item.
+    assert all("domain" not in item for item in state.payload["items"])
+
+    revealed = apply_activity_event(runtime, ActivityEvent(type="answer.revealed"))
+    reveal_state = public_activity_state(revealed)
+    assert reveal_state.reveal is not None
+    assert len(reveal_state.reveal["answer_map"]) == 6
+
+
+def test_sort_stack_scores_domain_placements_through_shared_runtime():
+    runtime = build_activity_runtime(
+        activity_type=ActivityType.SORT,
+        deck_id=92,
+        cards=_cards(8),
+        mode=ActivityMode.SOLO,
+        seed=654,
+        round_count=6,
+    )
+    hidden = runtime.rounds[runtime.round_index].reveal["answer_map"]
+    placements = dict(hidden)
+    first_card_id = next(iter(placements))
+    placements[first_card_id] = "Definitely Wrong"
+
+    scored = apply_activity_event(
+        runtime,
+        ActivityEvent(
+            type="response.submitted",
+            participant_id="learner-1",
+            payload={"placements": placements},
+        ),
+    )
+    state = public_activity_state(scored)
+    result = state.reveal["result"] if state.reveal else {}
+
+    assert state.phase == ActivityPhase.RESULT
+    assert result["correct_count"] == 5
+    assert result["total"] == 6
+    assert result["perfect"] is False
+    assert result["points"] == 417
+    assert state.participants[0].response == "5/6"
+    assert state.participants[0].score == 417
+
+
+def test_sort_stack_same_adapter_runs_in_solo_and_room_mode():
+    solo = build_activity_runtime(
+        activity_type=ActivityType.SORT,
+        deck_id=93,
+        cards=_cards(8),
+        mode=ActivityMode.SOLO,
+        seed=111,
+        round_count=6,
+    )
+    room = build_activity_runtime(
+        activity_type=ActivityType.SORT,
+        deck_id=93,
+        cards=_cards(8),
+        mode=ActivityMode.ROOM,
+        seed=111,
+        round_count=6,
+    )
+
+    assert public_activity_state(solo).payload == public_activity_state(room).payload
+    assert solo.definition == room.definition
+    assert solo.mode == ActivityMode.SOLO
+    assert room.mode == ActivityMode.ROOM
+
+
+def test_sort_stack_rejects_single_domain_deck():
+    cards = [
+        ActivityCard(
+            id=index,
+            word=f"One domain {index}",
+            definition=f"Definition {index}",
+            domain="Only Domain",
+            kind="concept",
+        )
+        for index in range(1, 6)
+    ]
+    with pytest.raises(ValueError, match="at least two distinct domains"):
+        build_activity_runtime(
+            activity_type=ActivityType.SORT,
+            deck_id=94,
+            cards=cards,
+            seed=9,
+        )
+
+
 def test_activity_rejects_too_few_cards():
     with pytest.raises(ValueError, match="needs at least 4 unique cards"):
         build_activity_runtime(
