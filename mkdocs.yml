@@ -68,6 +68,7 @@ nav:
   - Product:
       - Make Your Own Deck: MAKE_YOUR_OWN_DECK.md
       - Accounts & Email Verification: AUTHENTICATION.md
+      - Quest Room Access: QUEST_ROOM_ACCESS.md
   - Featured Platform Engineering:
       - Curriculum: CURRICULUM.md
       - Break/Fix Labs: LABS.md
