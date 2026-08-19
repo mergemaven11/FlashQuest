@@ -132,7 +132,7 @@ class _ActivityRound:
 
 @dataclass(frozen=True)
 class ActivityRuntime:
-    """Internal runtime shared by solo and future room synchronization hosts."""
+    """Internal runtime shared by solo and room synchronization hosts."""
 
     session_id: str
     definition: ActivityDefinition
@@ -171,9 +171,22 @@ MATCH_DEFINITION = ActivityDefinition(
     supports_teams=True,
 )
 
+SORT_DEFINITION = ActivityDefinition(
+    id="sort-the-stack",
+    type=ActivityType.SORT,
+    title="Sort the Stack",
+    description="Place cards into the learning domain where each one belongs.",
+    min_cards=4,
+    max_cards=12,
+    timer_policy=TimerPolicy.OPTIONAL,
+    supports_hints=False,
+    supports_teams=True,
+)
+
 ACTIVITY_DEFINITIONS: dict[ActivityType, ActivityDefinition] = {
     ActivityType.BLITZ: BLITZ_DEFINITION,
     ActivityType.MATCH: MATCH_DEFINITION,
+    ActivityType.SORT: SORT_DEFINITION,
 }
 
 
@@ -271,6 +284,50 @@ def _build_match_rounds(
     )
 
 
+def _build_sort_rounds(
+    cards: list[ActivityCard], rng: random.Random, item_count: int
+) -> tuple[_ActivityRound, ...]:
+    """Build a domain-sorting board without exposing each card's bucket early."""
+    domains = {card.domain.strip() or "General" for card in cards}
+    if len(domains) < 2:
+        raise ValueError("Sort the Stack needs cards from at least two distinct domains")
+
+    selected = cards[:]
+    rng.shuffle(selected)
+    selected = selected[:item_count]
+    selected_domains = {card.domain.strip() or "General" for card in selected}
+
+    # A small sample can randomly land in one domain. Force one card from a second
+    # domain so every generated board remains a real sorting challenge.
+    if len(selected_domains) < 2:
+        first_domain = next(iter(selected_domains))
+        replacement = next(
+            card for card in cards if (card.domain.strip() or "General") != first_domain
+        )
+        selected[-1] = replacement
+        selected_domains = {card.domain.strip() or "General" for card in selected}
+
+    items = [
+        {
+            "card_id": card.id,
+            "prompt": card.word,
+            "clue": card.definition,
+        }
+        for card in selected
+    ]
+    rng.shuffle(items)
+    buckets = sorted(selected_domains, key=str.casefold)
+    answer_map = {
+        str(card.id): card.domain.strip() or "General" for card in selected
+    }
+    return (
+        _ActivityRound(
+            payload={"items": items, "buckets": buckets, "axis": "domain"},
+            reveal={"answer_map": answer_map},
+        ),
+    )
+
+
 def build_activity_runtime(
     *,
     activity_type: ActivityType,
@@ -298,6 +355,12 @@ def build_activity_runtime(
     elif activity_type == ActivityType.MATCH:
         rounds = _build_match_rounds(
             rows, rng, min(max(definition.min_cards, round_count), len(rows))
+        )
+    elif activity_type == ActivityType.SORT:
+        rounds = _build_sort_rounds(
+            rows,
+            rng,
+            min(max(definition.min_cards, round_count), len(rows)),
         )
     else:  # pragma: no cover - guarded by the registry above
         raise ValueError(f"No adapter for activity type: {activity_type.value}")
@@ -406,6 +469,45 @@ def _score_match_response(
     )
 
 
+def _score_sort_response(
+    runtime: ActivityRuntime, event: ActivityEvent
+) -> ActivityRuntime:
+    """Score domain placements using the hidden card-to-domain answer map."""
+    current = runtime.rounds[runtime.round_index]
+    raw_placements = event.payload.get("placements")
+    submitted = raw_placements if isinstance(raw_placements, dict) else {}
+    answer_map = current.reveal["answer_map"]
+    correct_count = sum(
+        1
+        for card_id, domain in answer_map.items()
+        if str(submitted.get(card_id) or "") == domain
+    )
+    total = len(answer_map)
+    points = round((correct_count / total) * 500) if total else 0
+    perfect = correct_count == total and total > 0
+    participant_id = event.participant_id or "solo"
+    participant = _participant(runtime, participant_id)
+    updated = participant.model_copy(
+        update={
+            "score": participant.score + points,
+            "streak": participant.streak + 1 if perfect else 0,
+            "response": f"{correct_count}/{total}",
+            "round_complete": True,
+        }
+    )
+    return replace(
+        runtime,
+        phase=ActivityPhase.RESULT,
+        participants=_with_participant(runtime, updated),
+        round_result={
+            "correct_count": correct_count,
+            "total": total,
+            "perfect": perfect,
+            "points": points,
+        },
+    )
+
+
 def public_activity_state(runtime: ActivityRuntime) -> ActivityPublicState:
     """Serialize only data safe for the runtime's current phase."""
     if runtime.phase == ActivityPhase.COMPLETE:
@@ -447,6 +549,8 @@ def apply_activity_event(runtime: ActivityRuntime, event: ActivityEvent) -> Acti
             return _score_blitz_response(runtime, event)
         if runtime.definition.type == ActivityType.MATCH:
             return _score_match_response(runtime, event)
+        if runtime.definition.type == ActivityType.SORT:
+            return _score_sort_response(runtime, event)
         raise ValueError(
             f"No scoring adapter for activity type: {runtime.definition.type.value}"
         )
