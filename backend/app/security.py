@@ -127,20 +127,15 @@ def get_current_user(
     return user
 
 
-def require_verified_user(user: User = Depends(get_current_user)) -> User:
-    """Require an authenticated account with a verified email address."""
-    if not user.is_verified:
-        raise HTTPException(status_code=403, detail="Verify your email first")
-    return user
-
-
 def is_demo_account(user: User) -> bool:
     """Return whether this is the intentionally public sandbox account."""
     return user.email.strip().lower() == DEMO_LOGIN_EMAIL
 
 
-def require_creator_user(user: User = Depends(require_verified_user)) -> User:
-    """Require a verified non-demo account for content/room creation."""
+def require_verified_user(user: User = Depends(get_current_user)) -> User:
+    """Require a verified creator account; the public demo stays sandboxed."""
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail="Verify your email first")
     if is_demo_account(user):
         raise HTTPException(
             status_code=403,
