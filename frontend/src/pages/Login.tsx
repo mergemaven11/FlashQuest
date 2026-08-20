@@ -5,6 +5,10 @@ import { useAuth } from "../auth";
 const DEMO_EMAIL = "demo@flashquest.app";
 const DEMO_PASSWORD = "QuestRoomDemo!";
 
+function welcomeKey(userId: number) {
+  return `flashquest-welcome-seen:${userId}`;
+}
+
 export default function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
@@ -17,13 +21,15 @@ export default function Login() {
   const stateNext = (location.state as { from?: string } | null)?.from;
   const queryNext = new URLSearchParams(location.search).get("next");
   const safeQueryNext = queryNext?.startsWith("/") ? queryNext : null;
-  const next = stateNext ?? safeQueryNext ?? "/decks";
+  const explicitNext = stateNext ?? safeQueryNext;
 
-  async function loginWith(credentials: { email: string; password: string }, destination = next) {
+  async function loginWith(credentials: { email: string; password: string }, forcedDestination?: string) {
     setLoading(true);
     setError(null);
     try {
-      await signIn(credentials);
+      const signedInUser = await signIn(credentials);
+      const hasSeenWelcome = window.localStorage.getItem(welcomeKey(signedInUser.id)) === "1";
+      const destination = forcedDestination ?? explicitNext ?? (hasSeenWelcome ? "/study" : "/welcome");
       navigate(destination, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not sign in");
