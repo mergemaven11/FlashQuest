@@ -23,11 +23,12 @@ const DOCS_URL = "https://flashquest-docs.netlify.app/";
 function Shell() {
   const { user, signOut } = useAuth();
   const location = useLocation();
+  const roomsTarget = user ? "/rooms" : "/signup?next=%2Frooms";
   const navItems = [
     { to: "/study", icon: "⚡", label: "Play" },
     { to: "/arcade", icon: "🎮", label: "Arcade" },
     { to: "/library", icon: "📚", label: "Library" },
-    ...(user ? [{ to: "/rooms", icon: "👥", label: "Rooms" }] : []),
+    { to: roomsTarget, icon: "👥", label: "Quest Rooms" },
     { to: "/deck-lab", icon: "🧪", label: "Deck Lab" },
     ...(user ? [{ to: "/decks", icon: "🗂️", label: "My Decks" }] : []),
     { to: "/status", icon: "🗺️", label: "Deck Map" },
@@ -50,7 +51,7 @@ function Shell() {
           <div className="flex flex-wrap items-center gap-2">
             <nav className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-white/[0.035] p-1.5" aria-label="Primary navigation">
               {navItems.map((item) => (
-                <NavLink key={item.to} to={item.to} className={({ isActive }) => ["flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition", isActive ? "bg-[#faa307] text-[#370617] shadow-lg shadow-black/20" : "text-slate-300 hover:bg-white/10 hover:text-white"].join(" ")}>
+                <NavLink key={`${item.to}-${item.label}`} to={item.to} className={({ isActive }) => ["flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition", isActive ? "bg-[#faa307] text-[#370617] shadow-lg shadow-black/20" : "text-slate-300 hover:bg-white/10 hover:text-white"].join(" ")}>
                   <span aria-hidden="true">{item.icon}</span><span>{item.label}</span>
                 </NavLink>
               ))}
