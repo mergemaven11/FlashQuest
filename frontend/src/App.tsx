@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
 import { ExperienceProvider } from "./experience";
@@ -20,19 +21,30 @@ import VerifyEmail from "./pages/VerifyEmail";
 
 const DOCS_URL = "https://flashquest-docs.netlify.app/";
 
+function RequireAccount({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (user) return children;
+
+  const next = `${location.pathname}${location.search}`;
+  return <Navigate to={`/signup?next=${encodeURIComponent(next)}`} replace />;
+}
+
 function Shell() {
   const { user, signOut } = useAuth();
   const location = useLocation();
-  const roomsTarget = user ? "/rooms" : "/signup?next=%2Frooms";
-  const navItems = [
-    { to: "/study", icon: "⚡", label: "Play" },
-    { to: "/arcade", icon: "🎮", label: "Arcade" },
-    { to: "/library", icon: "📚", label: "Library" },
-    { to: roomsTarget, icon: "👥", label: "Quest Rooms" },
-    { to: "/deck-lab", icon: "🧪", label: "Deck Lab" },
-    ...(user ? [{ to: "/decks", icon: "🗂️", label: "My Decks" }] : []),
-    { to: "/status", icon: "🗺️", label: "Deck Map" },
-  ];
+  const navItems = user
+    ? [
+        { to: "/study", icon: "⚡", label: "Play" },
+        { to: "/arcade", icon: "🎮", label: "Arcade" },
+        { to: "/library", icon: "📚", label: "Library" },
+        { to: "/rooms", icon: "👥", label: "Quest Rooms" },
+        { to: "/deck-lab", icon: "🧪", label: "Deck Lab" },
+        { to: "/decks", icon: "🗂️", label: "My Decks" },
+        { to: "/status", icon: "🗺️", label: "Deck Map" },
+      ]
+    : [{ to: "/study", icon: "⚡", label: "Try demo" }];
 
   return (
     <div className="game-shell min-h-screen text-slate-100">
@@ -56,23 +68,29 @@ function Shell() {
                 </NavLink>
               ))}
             </nav>
-            <SoundToggle />
-            <NavLink
-              to="/preferences"
-              aria-label="Experience settings"
-              title="Experience settings"
-              className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
-            >
-              <span aria-hidden="true">🎚️</span><span className="hidden xl:inline">Experience</span>
-            </NavLink>
-            <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button flex items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08]">📖 Docs</a>
+
             {user ? (
-              <div className="flex items-center gap-2">
-                <span className="game-chip hidden px-3 py-2 text-xs font-bold text-slate-300 sm:inline">👋 {user.display_name}</span>
-                <button className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" onClick={() => void signOut()}>Sign out</button>
-              </div>
+              <>
+                <SoundToggle />
+                <NavLink
+                  to="/preferences"
+                  aria-label="Settings"
+                  title="Settings"
+                  className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
+                >
+                  <span aria-hidden="true">⚙️</span><span className="hidden xl:inline">Settings</span>
+                </NavLink>
+                <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button flex items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08]">📖 Docs</a>
+                <div className="flex items-center gap-2">
+                  <span className="game-chip hidden px-3 py-2 text-xs font-bold text-slate-300 sm:inline">👋 {user.display_name}</span>
+                  <button className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" onClick={() => void signOut()}>Sign out</button>
+                </div>
+              </>
             ) : (
-              <div className="flex gap-2"><NavLink className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" to="/login">Sign in</NavLink><NavLink className="game-button bg-[#ffba08] px-3 py-2 text-xs font-black text-[#370617]" to="/signup">Make a deck</NavLink></div>
+              <div className="flex gap-2">
+                <NavLink className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" to="/login">Sign in</NavLink>
+                <NavLink className="game-button bg-[#ffba08] px-3 py-2 text-xs font-black text-[#370617]" to="/signup">Create account</NavLink>
+              </div>
             )}
           </div>
         </div>
@@ -82,17 +100,17 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/study" element={<Study />} />
-          <Route path="/arcade" element={<Arcade />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/library/:slug" element={<LibraryDeck />} />
-          <Route path="/rooms" element={<Rooms />} />
-          <Route path="/rooms/invite" element={<RoomInvite />} />
-          <Route path="/rooms/:roomId" element={<Room />} />
-          <Route path="/deck-lab" element={<Admin />} />
+          <Route path="/arcade" element={<RequireAccount><Arcade /></RequireAccount>} />
+          <Route path="/library" element={<RequireAccount><Library /></RequireAccount>} />
+          <Route path="/library/:slug" element={<RequireAccount><LibraryDeck /></RequireAccount>} />
+          <Route path="/rooms" element={<RequireAccount><Rooms /></RequireAccount>} />
+          <Route path="/rooms/invite" element={<RequireAccount><RoomInvite /></RequireAccount>} />
+          <Route path="/rooms/:roomId" element={<RequireAccount><Room /></RequireAccount>} />
+          <Route path="/deck-lab" element={<RequireAccount><Admin /></RequireAccount>} />
           <Route path="/admin" element={<Navigate to="/deck-lab" replace />} />
-          <Route path="/decks" element={<MyDecks />} />
-          <Route path="/status" element={<Status />} />
-          <Route path="/preferences" element={<Preferences />} />
+          <Route path="/decks" element={<RequireAccount><MyDecks /></RequireAccount>} />
+          <Route path="/status" element={<RequireAccount><Status /></RequireAccount>} />
+          <Route path="/preferences" element={<RequireAccount><Preferences /></RequireAccount>} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
@@ -101,8 +119,8 @@ function Shell() {
       </main>
 
       <footer className="relative z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500">
-        <span>Library · community decks · Arcade · Quest Rooms · adaptable learning modes</span>
-        <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">FastAPI · React · PostgreSQL · Docker · Docs ↗</a>
+        <span>{user ? "Library · community decks · Arcade · Quest Rooms · adaptable learning modes" : "Learn more after you create an account."}</span>
+        {user && <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">FastAPI · React · PostgreSQL · Docker · Docs ↗</a>}
       </footer>
     </div>
   );
