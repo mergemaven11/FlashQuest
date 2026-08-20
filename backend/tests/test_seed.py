@@ -218,20 +218,28 @@ def test_seed_scopes_prompt_identity_to_each_deck(sqlite_session):
     assert second_card.deck_id == original_second_deck_id
 
 
-def test_seed_demo_room_is_login_ready_idempotent_and_non_creator(client, sqlite_session):
+def test_seed_demo_room_is_login_ready_idempotent_and_non_creator(
+    client, sqlite_session
+):
     seed_all_curricula(sqlite_session)
     first = seed_demo_room(sqlite_session)
 
     demo = sqlite_session.exec(select(User).where(User.email == DEMO_LOGIN_EMAIL)).one()
-    guide = sqlite_session.exec(select(User).where(User.email == DEMO_GUIDE_EMAIL)).one()
+    guide = sqlite_session.exec(
+        select(User).where(User.email == DEMO_GUIDE_EMAIL)
+    ).one()
     room = sqlite_session.exec(
         select(StudyRoom).where(StudyRoom.name == DEMO_ROOM_NAME)
     ).one()
     members = sqlite_session.exec(
-        select(RoomMember).where(RoomMember.room_id == room.id).order_by(RoomMember.user_id)
+        select(RoomMember)
+        .where(RoomMember.room_id == room.id)
+        .order_by(RoomMember.user_id)
     ).all()
     messages = sqlite_session.exec(
-        select(RoomMessage).where(RoomMessage.room_id == room.id).order_by(RoomMessage.id)
+        select(RoomMessage)
+        .where(RoomMessage.room_id == room.id)
+        .order_by(RoomMessage.id)
     ).all()
 
     assert demo.display_name == DEMO_DISPLAY_NAME
@@ -290,13 +298,19 @@ def test_seed_demo_room_is_login_ready_idempotent_and_non_creator(client, sqlite
     assert second["room_id"] == first["room_id"]
     assert second["demo_user_id"] == first["demo_user_id"]
     assert second["created_messages"] == 0
-    assert len(
-        sqlite_session.exec(
-            select(StudyRoom).where(StudyRoom.name == DEMO_ROOM_NAME)
-        ).all()
-    ) == 1
-    assert len(
-        sqlite_session.exec(
-            select(RoomMessage).where(RoomMessage.room_id == room.id)
-        ).all()
-    ) == 3
+    assert (
+        len(
+            sqlite_session.exec(
+                select(StudyRoom).where(StudyRoom.name == DEMO_ROOM_NAME)
+            ).all()
+        )
+        == 1
+    )
+    assert (
+        len(
+            sqlite_session.exec(
+                select(RoomMessage).where(RoomMessage.room_id == room.id)
+            ).all()
+        )
+        == 3
+    )
