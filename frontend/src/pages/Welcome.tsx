@@ -10,9 +10,10 @@ export default function Welcome() {
   const navigate = useNavigate();
 
   if (!user) return null;
+  const signedInUser = user;
 
   function continueTo(path: string) {
-    window.localStorage.setItem(welcomeKey(user.id), "1");
+    window.localStorage.setItem(welcomeKey(signedInUser.id), "1");
     navigate(path);
   }
 
@@ -28,7 +29,7 @@ export default function Welcome() {
     <div className="mx-auto max-w-4xl py-4 sm:py-8">
       <section className="game-panel p-6 sm:p-9">
         <p className="metric-label">🎉 Welcome Quest</p>
-        <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">You’re in, {user.display_name}.</h1>
+        <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">You’re in, {signedInUser.display_name}.</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
           The public demo only showed the core memory loop. Your account unlocks the rest of FlashQuest. Pick what you want to explore first — there is no required order.
         </p>
@@ -53,7 +54,7 @@ export default function Welcome() {
             <p className="font-black text-white">⚙️ Settings is where the experience controls live.</p>
             <p className="mt-1 text-sm text-slate-400">Switch between Arcade, Chill, Focus, and Party, plus sound and accessibility preferences.</p>
           </div>
-          <Link className="text-sm font-black text-[#ffba08] hover:text-white" to="/preferences" onClick={() => window.localStorage.setItem(welcomeKey(user.id), "1")}>Open Settings →</Link>
+          <Link className="text-sm font-black text-[#ffba08] hover:text-white" to="/preferences" onClick={() => window.localStorage.setItem(welcomeKey(signedInUser.id), "1")}>Open Settings →</Link>
         </div>
 
         <div className="mt-7 flex flex-wrap gap-3">
