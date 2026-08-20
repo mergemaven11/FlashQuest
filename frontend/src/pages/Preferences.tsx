@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useExperience } from "../experienceContext";
 import { useGameFeel } from "../gameFeelContext";
 import type { LearningMode } from "../experienceContext";
@@ -55,13 +56,24 @@ export default function Preferences() {
   return (
     <div className="mx-auto grid max-w-5xl gap-6">
       <section>
-        <p className="metric-label">🎚️ Experience settings</p>
+        <p className="metric-label">⚙️ Settings</p>
         <h1 className="mt-2 text-4xl font-black tracking-tight text-white sm:text-5xl">
           Learn your way <span className="ember-text">right now.</span>
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
           These are presentation preferences, not permanent learner labels. Switch whenever the subject, environment, or your mood changes — your decks and mastery stay the same.
         </p>
+      </section>
+
+      <section className="game-panel grid gap-4 p-5 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="metric-label">Plans & billing</p>
+          <h2 className="mt-1 text-xl font-black text-white">Free now. Power tiers when you need more.</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">See the planned Free, Pro, and Educator tiers. Checkout is not enabled yet.</p>
+        </div>
+        <Link className="game-button bg-[#ffba08] px-5 py-3 text-sm font-black text-[#370617]" to="/plans">
+          View plans →
+        </Link>
       </section>
 
       <section className="game-panel p-5 sm:p-6">

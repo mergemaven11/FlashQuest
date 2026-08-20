@@ -11,6 +11,7 @@ import Library from "./pages/Library";
 import LibraryDeck from "./pages/LibraryDeck";
 import Login from "./pages/Login";
 import MyDecks from "./pages/MyDecks";
+import Plans from "./pages/Plans";
 import Preferences from "./pages/Preferences";
 import Room from "./pages/Room";
 import RoomInvite from "./pages/RoomInvite";
@@ -116,6 +117,7 @@ function Shell() {
           <Route path="/decks" element={<RequireAccount><MyDecks /></RequireAccount>} />
           <Route path="/status" element={<RequireAccount><Status /></RequireAccount>} />
           <Route path="/preferences" element={<RequireAccount><Preferences /></RequireAccount>} />
+          <Route path="/plans" element={<RequireAccount><Plans /></RequireAccount>} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verify-email" element={<VerifyEmail />} />

@@ -2,9 +2,6 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 
-const DEMO_EMAIL = "demo@flashquest.app";
-const DEMO_PASSWORD = "QuestRoomDemo!";
-
 function welcomeKey(userId: number) {
   return `flashquest-welcome-seen:${userId}`;
 }
@@ -23,13 +20,13 @@ export default function Login() {
   const safeQueryNext = queryNext?.startsWith("/") ? queryNext : null;
   const explicitNext = stateNext ?? safeQueryNext;
 
-  async function loginWith(credentials: { email: string; password: string }, forcedDestination?: string) {
+  async function loginWith(credentials: { email: string; password: string }) {
     setLoading(true);
     setError(null);
     try {
       const signedInUser = await signIn(credentials);
       const hasSeenWelcome = window.localStorage.getItem(welcomeKey(signedInUser.id)) === "1";
-      const destination = forcedDestination ?? explicitNext ?? (hasSeenWelcome ? "/study" : "/welcome");
+      const destination = explicitNext ?? (hasSeenWelcome ? "/study" : "/welcome");
       navigate(destination, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not sign in");
@@ -44,31 +41,11 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto grid max-w-xl gap-5 py-6 sm:py-10">
-      <section className="game-panel border-[#faa307]/30 p-5 sm:p-6">
-        <p className="metric-label">👥 Quest Rooms demo</p>
-        <h2 className="mt-2 text-2xl font-black text-white">Want to see the chat rooms right now?</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          Use the sandbox account below. It opens a private demo room with realtime chat and multiplayer Arcade, but it cannot create decks or new rooms.
-        </p>
-        <div className="mt-4 grid gap-2 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm sm:grid-cols-2">
-          <div><span className="text-slate-500">Demo email</span><p className="mt-1 font-black text-white">{DEMO_EMAIL}</p></div>
-          <div><span className="text-slate-500">Password</span><p className="mt-1 font-black text-white">{DEMO_PASSWORD}</p></div>
-        </div>
-        <button
-          type="button"
-          className="game-button mt-4 w-full bg-[#ffba08] px-5 py-3 font-black text-[#370617]"
-          disabled={loading}
-          onClick={() => void loginWith({ email: DEMO_EMAIL, password: DEMO_PASSWORD }, "/rooms")}
-        >
-          {loading ? "Entering demo…" : "👥 Enter the Demo Room"}
-        </button>
-      </section>
-
+    <div className="mx-auto max-w-xl py-6 sm:py-10">
       <form onSubmit={onSubmit} className="game-panel p-6 sm:p-8">
         <p className="metric-label">Welcome back</p>
         <h1 className="mt-2 text-3xl font-black text-white">Sign in to FlashQuest</h1>
-        <p className="mt-2 text-sm text-slate-400">Your decks, progress, and Quest Room memberships stay tied to your verified account.</p>
+        <p className="mt-2 text-sm text-slate-400">Pick up your decks, progress, and Quest Rooms where you left off.</p>
         <div className="mt-6 grid gap-4">
           <label className="grid gap-1.5 text-sm font-bold text-slate-200">Email
             <input className="game-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
