@@ -12,6 +12,7 @@ const plans = [
       "Create, remix, and publish decks",
       "Public Quest Rooms",
     ],
+    featured: false,
   },
   {
     name: "Pro",
@@ -41,6 +42,7 @@ const plans = [
       "Expanded room and deck organization",
       "Future assignment and classroom workflows",
     ],
+    featured: false,
   },
 ] as const;
 
