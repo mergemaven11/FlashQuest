@@ -19,6 +19,12 @@ from .models import AuthSession, User
 
 PBKDF2_ITERATIONS = 600_000
 DEMO_USER_ID = 0
+DEMO_LOGIN_EMAIL = "demo@flashquest.app"
+DEMO_LOGIN_PASSWORD = "QuestRoomDemo!"
+DEMO_DISPLAY_NAME = "Demo Explorer"
+DEMO_GUIDE_EMAIL = "guide@flashquest.internal"
+DEMO_GUIDE_NAME = "FlashQuest Guide"
+DEMO_ROOM_NAME = "FlashQuest Demo Room"
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -125,4 +131,19 @@ def require_verified_user(user: User = Depends(get_current_user)) -> User:
     """Require an authenticated account with a verified email address."""
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Verify your email first")
+    return user
+
+
+def is_demo_account(user: User) -> bool:
+    """Return whether this is the intentionally public sandbox account."""
+    return user.email.strip().lower() == DEMO_LOGIN_EMAIL
+
+
+def require_creator_user(user: User = Depends(require_verified_user)) -> User:
+    """Require a verified non-demo account for content/room creation."""
+    if is_demo_account(user):
+        raise HTTPException(
+            status_code=403,
+            detail="The public demo account is read-only outside its demo room",
+        )
     return user
