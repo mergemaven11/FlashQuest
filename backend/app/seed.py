@@ -1,4 +1,4 @@
-"""Seed FlashQuest Official curricula into the configured database.
+"""Seed FlashQuest Official curricula and the safe Quest Room demo.
 
 Run with Docker:
     docker compose exec api python -m app.seed
@@ -18,7 +18,18 @@ from typing import Any
 from sqlmodel import Session, select
 
 from .db import engine
-from .models import Card, Deck, UserCard, utc_now
+from .models import Card, Deck, User, UserCard, utc_now
+from .room_models import RoomMember, RoomMessage, StudyRoom
+from .security import (
+    DEMO_DISPLAY_NAME,
+    DEMO_GUIDE_EMAIL,
+    DEMO_GUIDE_NAME,
+    DEMO_LOGIN_EMAIL,
+    DEMO_LOGIN_PASSWORD,
+    DEMO_ROOM_NAME,
+    hash_password,
+    verify_password,
+)
 
 DATA_DIR = Path(__file__).parent / "data"
 CONCEPT_DECK_PATH = DATA_DIR / "platform_engineering_cards.json"
@@ -247,8 +258,6 @@ def seed_curriculum(session: Session, spec: CurriculumSpec) -> dict[str, int | s
     deck = _official_deck(session, spec)
     deck_id = int(deck.id or 0)
 
-    # Prompt identity is scoped to the deck. Different subjects may legitimately
-    # use the same wording without colliding during seed repair.
     existing_cards = {
         card.word: card
         for card in session.exec(select(Card).where(Card.deck_id == deck_id)).all()
@@ -334,10 +343,141 @@ def seed_all_curricula(session: Session) -> list[dict[str, int | str]]:
     return [seed_curriculum(session, spec) for spec in OFFICIAL_CURRICULA]
 
 
+def _ensure_membership(
+    session: Session,
+    *,
+    room_id: int,
+    user_id: int,
+    role: str,
+) -> RoomMember:
+    member = session.exec(
+        select(RoomMember).where(
+            RoomMember.room_id == room_id,
+            RoomMember.user_id == user_id,
+        )
+    ).first()
+    if member is None:
+        member = RoomMember(
+            room_id=room_id,
+            user_id=user_id,
+            role=role,
+            status="active",
+        )
+    else:
+        member.role = role
+        member.status = "active"
+        member.removed_at = None
+        member.last_seen_at = utc_now()
+    session.add(member)
+    return member
+
+
+def seed_demo_room(session: Session) -> dict[str, int | str]:
+    """Create a stable, sandboxed account and private room for product demos."""
+    deck = session.exec(select(Deck).where(Deck.slug == "platform-engineering")).first()
+    if deck is None or deck.id is None:
+        raise RuntimeError("Platform Engineering deck must be seeded before the demo room")
+
+    guide = session.exec(select(User).where(User.email == DEMO_GUIDE_EMAIL)).first()
+    if guide is None:
+        guide = User(
+            email=DEMO_GUIDE_EMAIL,
+            display_name=DEMO_GUIDE_NAME,
+            password_hash="disabled",
+            is_verified=True,
+        )
+    else:
+        guide.display_name = DEMO_GUIDE_NAME
+        guide.password_hash = "disabled"
+        guide.is_verified = True
+    session.add(guide)
+    session.flush()
+
+    demo = session.exec(select(User).where(User.email == DEMO_LOGIN_EMAIL)).first()
+    if demo is None:
+        demo = User(
+            email=DEMO_LOGIN_EMAIL,
+            display_name=DEMO_DISPLAY_NAME,
+            password_hash=hash_password(DEMO_LOGIN_PASSWORD),
+            is_verified=True,
+        )
+    else:
+        demo.display_name = DEMO_DISPLAY_NAME
+        demo.is_verified = True
+        if not verify_password(DEMO_LOGIN_PASSWORD, demo.password_hash):
+            demo.password_hash = hash_password(DEMO_LOGIN_PASSWORD)
+    session.add(demo)
+    session.flush()
+
+    guide_id = int(guide.id or 0)
+    demo_id = int(demo.id or 0)
+    room = session.exec(
+        select(StudyRoom).where(
+            StudyRoom.name == DEMO_ROOM_NAME,
+            StudyRoom.host_user_id == guide_id,
+        )
+    ).first()
+    if room is None:
+        room = StudyRoom(
+            host_user_id=guide_id,
+            deck_id=int(deck.id),
+            name=DEMO_ROOM_NAME,
+            visibility="private",
+            status="open",
+        )
+        session.add(room)
+        session.flush()
+    else:
+        room.deck_id = int(deck.id)
+        room.visibility = "private"
+        room.status = "open"
+        room.closed_at = None
+        room.updated_at = utc_now()
+        session.add(room)
+        session.flush()
+
+    room_id = int(room.id or 0)
+    _ensure_membership(session, room_id=room_id, user_id=guide_id, role="host")
+    _ensure_membership(session, room_id=room_id, user_id=demo_id, role="member")
+
+    starter_messages = (
+        "👋 Welcome to the FlashQuest Demo Room. This is a safe sandbox for trying realtime chat and room features.",
+        "🎮 Quest Rooms can run the same Blitz, Match Quest, and Sort the Stack activities used in solo Arcade.",
+        "💬 Send a message below to test realtime chat. The public demo account cannot create decks or new rooms.",
+    )
+    existing_bodies = set(
+        session.exec(
+            select(RoomMessage.body).where(RoomMessage.room_id == room_id)
+        ).all()
+    )
+    created_messages = 0
+    for body in starter_messages:
+        if body in existing_bodies:
+            continue
+        session.add(
+            RoomMessage(
+                room_id=room_id,
+                user_id=guide_id,
+                kind="system",
+                body=body,
+            )
+        )
+        created_messages += 1
+
+    session.commit()
+    return {
+        "room_id": room_id,
+        "demo_user_id": demo_id,
+        "guide_user_id": guide_id,
+        "created_messages": created_messages,
+    }
+
+
 def run() -> None:
     """Seed the configured database and print one compact summary per deck."""
     with Session(engine) as session:
         results = seed_all_curricula(session)
+        demo_result = seed_demo_room(session)
 
     total_cards = sum(int(result["deck_size"]) for result in results)
     print(
@@ -351,6 +491,9 @@ def run() -> None:
             f"{result['updated_cards']} repaired, "
             f"{result['existing_cards']} already present)."
         )
+    print(
+        f"- demo-room: room #{demo_result['room_id']} ready for {DEMO_LOGIN_EMAIL}."
+    )
 
 
 if __name__ == "__main__":
