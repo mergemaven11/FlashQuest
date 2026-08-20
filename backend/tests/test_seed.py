@@ -2,7 +2,8 @@
 
 from sqlmodel import select
 
-from app.models import Card, Deck, UserCard
+from app.models import Card, Deck, User, UserCard
+from app.room_models import RoomMember, RoomMessage, StudyRoom
 from app.seed import (
     DEMO_USER_ID,
     OFFICIAL_CURRICULA,
@@ -13,7 +14,16 @@ from app.seed import (
     PLATFORM_ENGINEERING_LABS_BY_DOMAIN,
     load_deck,
     seed_all_curricula,
+    seed_demo_room,
     seed_platform_deck,
+)
+from app.security import (
+    DEMO_DISPLAY_NAME,
+    DEMO_GUIDE_EMAIL,
+    DEMO_LOGIN_EMAIL,
+    DEMO_LOGIN_PASSWORD,
+    DEMO_ROOM_NAME,
+    verify_password,
 )
 
 
@@ -206,3 +216,101 @@ def test_seed_scopes_prompt_identity_to_each_deck(sqlite_session):
     sqlite_session.refresh(second_card)
     assert first_card.deck_id == original_first_deck_id
     assert second_card.deck_id == original_second_deck_id
+
+
+def test_seed_demo_room_is_login_ready_idempotent_and_non_creator(
+    client, sqlite_session
+):
+    seed_all_curricula(sqlite_session)
+    first = seed_demo_room(sqlite_session)
+
+    demo = sqlite_session.exec(select(User).where(User.email == DEMO_LOGIN_EMAIL)).one()
+    guide = sqlite_session.exec(
+        select(User).where(User.email == DEMO_GUIDE_EMAIL)
+    ).one()
+    room = sqlite_session.exec(
+        select(StudyRoom).where(StudyRoom.name == DEMO_ROOM_NAME)
+    ).one()
+    members = sqlite_session.exec(
+        select(RoomMember)
+        .where(RoomMember.room_id == room.id)
+        .order_by(RoomMember.user_id)
+    ).all()
+    messages = sqlite_session.exec(
+        select(RoomMessage)
+        .where(RoomMessage.room_id == room.id)
+        .order_by(RoomMessage.id)
+    ).all()
+
+    assert demo.display_name == DEMO_DISPLAY_NAME
+    assert demo.is_verified is True
+    assert verify_password(DEMO_LOGIN_PASSWORD, demo.password_hash) is True
+    assert guide.is_verified is True
+    assert verify_password(DEMO_LOGIN_PASSWORD, guide.password_hash) is False
+    assert room.visibility == "private"
+    assert room.status == "open"
+    assert room.host_user_id == guide.id
+    assert {(member.user_id, member.role, member.status) for member in members} == {
+        (guide.id, "host", "active"),
+        (demo.id, "member", "active"),
+    }
+    assert len(messages) == 3
+    assert all(message.user_id == guide.id for message in messages)
+    assert first["created_messages"] == 3
+
+    login = client.post(
+        "/auth/login",
+        json={"email": DEMO_LOGIN_EMAIL, "password": DEMO_LOGIN_PASSWORD},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    mine = client.get("/rooms/mine", headers=headers)
+    assert mine.status_code == 200
+    assert [item["name"] for item in mine.json()] == [DEMO_ROOM_NAME]
+
+    create_room = client.post(
+        "/rooms",
+        json={
+            "deck_id": room.deck_id,
+            "name": "Should not exist",
+            "visibility": "private",
+        },
+        headers=headers,
+    )
+    assert create_room.status_code == 403
+
+    create_deck = client.post(
+        "/decks",
+        json={
+            "title": "Should not exist",
+            "description": "demo sandbox",
+            "subject": "Testing",
+            "difficulty": "beginner",
+            "tags": [],
+        },
+        headers=headers,
+    )
+    assert create_deck.status_code == 403
+
+    second = seed_demo_room(sqlite_session)
+    assert second["room_id"] == first["room_id"]
+    assert second["demo_user_id"] == first["demo_user_id"]
+    assert second["created_messages"] == 0
+    assert (
+        len(
+            sqlite_session.exec(
+                select(StudyRoom).where(StudyRoom.name == DEMO_ROOM_NAME)
+            ).all()
+        )
+        == 1
+    )
+    assert (
+        len(
+            sqlite_session.exec(
+                select(RoomMessage).where(RoomMessage.room_id == room.id)
+            ).all()
+        )
+        == 3
+    )
