@@ -56,7 +56,7 @@ export default function Signup() {
           <p className="mt-2 text-sm text-slate-500">
             {joiningRooms
               ? "Verify your email, then sign in and FlashQuest will send you to Quest Rooms."
-              : "Verify your email to unlock private decks, durable progress, and Quest Rooms."}
+              : "Verify your email, then sign in to continue your quest."}
           </p>
           {message && <p className="mt-5 rounded-xl border border-[#faa307]/20 bg-[#faa307]/10 p-3 text-sm text-[#ffba08]">{message}</p>}
           {error && <p className="mt-5 rounded-xl border border-[#d00000]/40 bg-[#6a040f]/40 p-3 text-sm text-rose-200">{error}</p>}
@@ -72,17 +72,17 @@ export default function Signup() {
   return (
     <div className="mx-auto max-w-xl py-6 sm:py-10">
       <form onSubmit={onSubmit} className="game-panel p-6 sm:p-8">
-        <p className="metric-label">{joiningRooms ? "👥 Join Quest Rooms" : "Make your own deck"}</p>
+        <p className="metric-label">{joiningRooms ? "👥 Join Quest Rooms" : "Continue your quest"}</p>
         <h1 className="mt-2 text-3xl font-black text-white">Create your FlashQuest account</h1>
         <p className="mt-2 text-sm leading-6 text-slate-400">
           {joiningRooms
-            ? "Create and verify an account to join persistent study chat, presence, and multiplayer Arcade with other learners."
-            : "The public study demo is free to try. An account adds private decks, durable progress, publishing, and Quest Rooms."}
+            ? "Create and verify an account so FlashQuest can take you directly to the room experience you chose."
+            : "You’ve tried the public demo. Create an account to unlock the full FlashQuest experience."}
         </p>
 
         {joiningRooms && (
           <div className="mt-5 rounded-2xl border border-[#faa307]/25 bg-[#faa307]/[0.07] p-4 text-sm leading-6 text-slate-300">
-            <b className="text-[#ffba08]">Why an account?</b> Quest Rooms keep membership, chat authorship, invites, moderation, and multiplayer state tied to real signed-in learners.
+            <b className="text-[#ffba08]">Why an account?</b> Quest Rooms need a signed-in identity for membership and realtime participation.
           </div>
         )}
 
