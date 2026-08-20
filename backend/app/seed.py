@@ -376,7 +376,9 @@ def seed_demo_room(session: Session) -> dict[str, int | str]:
     """Create a stable, sandboxed account and private room for product demos."""
     deck = session.exec(select(Deck).where(Deck.slug == "platform-engineering")).first()
     if deck is None or deck.id is None:
-        raise RuntimeError("Platform Engineering deck must be seeded before the demo room")
+        raise RuntimeError(
+            "Platform Engineering deck must be seeded before the demo room"
+        )
 
     guide = session.exec(select(User).where(User.email == DEMO_GUIDE_EMAIL)).first()
     if guide is None:
@@ -491,9 +493,7 @@ def run() -> None:
             f"{result['updated_cards']} repaired, "
             f"{result['existing_cards']} already present)."
         )
-    print(
-        f"- demo-room: room #{demo_result['room_id']} ready for {DEMO_LOGIN_EMAIL}."
-    )
+    print(f"- demo-room: room #{demo_result['room_id']} ready for {DEMO_LOGIN_EMAIL}.")
 
 
 if __name__ == "__main__":
