@@ -1,9 +1,14 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { resendVerification, signup } from "../api";
+import { DEMO_ACCOUNT_EMAIL, useAuth } from "../auth";
+
+const DEMO_PASSWORD = "QuestRoomDemo!";
 
 export default function Signup() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -11,6 +16,8 @@ export default function Signup() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
 
   const requestedNext = new URLSearchParams(location.search).get("next");
   const safeNext = requestedNext?.startsWith("/") ? requestedNext : null;
@@ -29,6 +36,19 @@ export default function Signup() {
       setError(e instanceof Error ? e.message : "Could not create account");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function enterDemoRoom() {
+    setDemoLoading(true);
+    setDemoError(null);
+    try {
+      await signIn({ email: DEMO_ACCOUNT_EMAIL, password: DEMO_PASSWORD });
+      navigate("/rooms", { replace: true });
+    } catch (e) {
+      setDemoError(e instanceof Error ? e.message : "Could not enter the demo room");
+    } finally {
+      setDemoLoading(false);
     }
   }
 
@@ -70,7 +90,7 @@ export default function Signup() {
   }
 
   return (
-    <div className="mx-auto max-w-xl py-6 sm:py-10">
+    <div className="mx-auto grid max-w-xl gap-5 py-6 sm:py-10">
       <form onSubmit={onSubmit} className="game-panel p-6 sm:p-8">
         <p className="metric-label">{joiningRooms ? "👥 Join Quest Rooms" : "Continue your quest"}</p>
         <h1 className="mt-2 text-3xl font-black text-white">Create your FlashQuest account</h1>
@@ -103,6 +123,23 @@ export default function Signup() {
         <button className="game-button mt-6 w-full bg-[#ffba08] px-5 py-3 font-black text-[#370617]" disabled={loading}>{loading ? "Creating account…" : joiningRooms ? "Create account for Quest Rooms →" : "Create account →"}</button>
         <p className="mt-5 text-center text-sm text-slate-500">Already verified? <Link className="font-bold text-[#faa307]" to={loginTarget}>Sign in</Link></p>
       </form>
+
+      <section className="game-panel border-[#faa307]/25 p-5 sm:p-6">
+        <p className="metric-label">👀 Want to look around first?</p>
+        <h2 className="mt-2 text-xl font-black text-white">Enter the Demo Room</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-400">
+          See realtime chat and the signed-in room experience without creating an account yet. Demo sessions reset automatically after 2 minutes.
+        </p>
+        {demoError && <p className="mt-4 rounded-xl border border-[#d00000]/40 bg-[#6a040f]/40 p-3 text-sm text-rose-200">{demoError}</p>}
+        <button
+          type="button"
+          className="game-button mt-4 w-full border border-[#faa307]/35 bg-[#faa307]/10 px-5 py-3 font-black text-[#ffba08]"
+          disabled={demoLoading}
+          onClick={() => void enterDemoRoom()}
+        >
+          {demoLoading ? "Entering demo…" : "👥 Enter Demo Room"}
+        </button>
+      </section>
     </div>
   );
 }
