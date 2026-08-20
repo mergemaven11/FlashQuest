@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth";
+import { DEMO_ACCOUNT_EMAIL, useAuth } from "../auth";
 
-const DEMO_EMAIL = "demo@flashquest.app";
 const DEMO_PASSWORD = "QuestRoomDemo!";
 
 function welcomeKey(userId: number) {
@@ -51,15 +50,18 @@ export default function Login() {
         <p className="mt-2 text-sm leading-6 text-slate-400">
           Use the sandbox account below. It opens a private demo room with realtime chat and multiplayer Arcade, but it cannot create decks or new rooms.
         </p>
+        <p className="mt-3 rounded-xl border border-[#faa307]/20 bg-[#faa307]/[0.07] p-3 text-xs font-bold leading-5 text-[#ffba08]">
+          Demo sessions automatically sign out and reset after 2 minutes.
+        </p>
         <div className="mt-4 grid gap-2 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm sm:grid-cols-2">
-          <div><span className="text-slate-500">Demo email</span><p className="mt-1 font-black text-white">{DEMO_EMAIL}</p></div>
+          <div><span className="text-slate-500">Demo email</span><p className="mt-1 font-black text-white">{DEMO_ACCOUNT_EMAIL}</p></div>
           <div><span className="text-slate-500">Password</span><p className="mt-1 font-black text-white">{DEMO_PASSWORD}</p></div>
         </div>
         <button
           type="button"
           className="game-button mt-4 w-full bg-[#ffba08] px-5 py-3 font-black text-[#370617]"
           disabled={loading}
-          onClick={() => void loginWith({ email: DEMO_EMAIL, password: DEMO_PASSWORD }, "/rooms")}
+          onClick={() => void loginWith({ email: DEMO_ACCOUNT_EMAIL, password: DEMO_PASSWORD }, "/rooms")}
         >
           {loading ? "Entering demo…" : "👥 Enter the Demo Room"}
         </button>
