@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="frontend/public/flashquest-logo.svg" alt="FlashQuest logo" width="180" />
+</div>
+
 # FlashQuest’s 🎮🧠
 
 **Learn it. Break it. Fix it. Remember it.**
@@ -36,7 +40,7 @@ Try featured demo
       ↓
 Sign up
       ↓
-Verify email
+Verify email or use Google/GitHub
       ↓
 Sign in
       ↓
@@ -78,20 +82,21 @@ XP/streak presentation is session-local. Durable accounts, decks, cards, mastery
 
 ---
 
-## 🔐 Accounts and email verification
+## 🔐 Accounts and authentication
 
-Custom deck creation requires a verified account.
+FlashQuest supports **Google and GitHub OAuth** as the preferred sign-in paths. Provider-verified accounts skip FlashQuest email verification. Email/password remains available as a fallback and still uses the verification-email flow.
 
 Security boundaries include:
 
 - salted **PBKDF2-HMAC-SHA256** password hashes;
 - high-entropy opaque bearer sessions stored in PostgreSQL **only as SHA-256 hashes**;
+- OAuth `state` validation before provider callbacks are accepted;
 - one-time, expiring email-verification tokens stored only as hashes;
 - private deck/card APIs scoped to the signed-in owner;
 - built-in starter content read-only for normal users;
 - server-side `DEMO_DELETE_PASSWORD` protection for destructive demo maintenance.
 
-Local development uses `EMAIL_DELIVERY_MODE=console`, which prints verification URLs to API logs. Hosted delivery is designed for **Resend**.
+Local development uses `EMAIL_DELIVERY_MODE=console`, which prints verification URLs to API logs. Hosted email/password delivery is designed for **Resend**.
 
 See [Accounts & Email Verification](docs/AUTHENTICATION.md).
 
@@ -140,7 +145,9 @@ React / TypeScript
   ▼
 FastAPI
   │
-  ├── Resend (email verification)
+  ├── Google OAuth
+  ├── GitHub OAuth
+  └── Resend (email verification fallback)
   │
   ▼
 PostgreSQL 16
@@ -233,16 +240,16 @@ The Fly release command runs:
 alembic upgrade head && python -m app.seed
 ```
 
-Before public signup works in hosted `resend` mode, configure at least:
+OAuth production secrets:
 
-```bash
-fly secrets set \
-  RESEND_API_KEY='...' \
-  DEMO_DELETE_PASSWORD='...' \
-  -a flashcards-tobias
+```text
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GITHUB_CLIENT_ID
+GITHUB_CLIENT_SECRET
 ```
 
-Configure `EMAIL_FROM` to a sender accepted by your Resend account.
+Email/password signup can additionally use `RESEND_API_KEY` and a verified `EMAIL_FROM` sender.
 
 **Netlify deploying the frontend does not migrate PostgreSQL.** The backend commit must also deploy to Fly so the account/deck migration and seed release command run.
 
@@ -286,7 +293,7 @@ Pull requests validate:
 backend/app/
 ├── data/              # featured curriculum JSON
 ├── routers/
-│   ├── auth.py        # signup / verify / login / logout
+│   ├── auth.py        # signup / OAuth / verify / login / logout
 │   ├── decks.py       # featured + owned decks
 │   ├── cards.py       # owner-scoped card CRUD
 │   └── study.py       # deck-aware spaced repetition
@@ -316,6 +323,7 @@ FlashQuest’s now demonstrates more than CRUD:
 
 - reusable product/data modeling;
 - account ownership boundaries;
+- Google/GitHub OAuth integration;
 - email-verification lifecycle;
 - password/token handling;
 - explicit migration + seed lifecycle;
