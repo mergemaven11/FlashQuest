@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="frontend/public/flashquest-logo.svg" alt="FlashQuest logo" width="180" />
+</div>
+
 # FlashQuest’s 🎮🧠
 
 **Learn it. Break it. Fix it. Remember it.**
