@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">FlashQuest logo</title>
+  <desc id="desc">Pink brain with a white lightning bolt on a dark rounded square.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#171532"/>
+      <stop offset="1" stop-color="#090d18"/>
+    </linearGradient>
+    <linearGradient id="brain" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff6fb0"/>
+      <stop offset="1" stop-color="#ff3f93"/>
+    </linearGradient>
+  </defs>
+  <rect x="18" y="18" width="476" height="476" rx="104" fill="url(#bg)"/>
+  <g fill="url(#brain)" stroke="#12142d" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M250 116c-30-25-81-20-98 15-44-5-76 33-69 74-42 18-52 70-27 102-19 34 2 80 42 90 7 42 51 66 90 47 21 28 47 33 62 29V116Z"/>
+    <path d="M262 116c30-25 81-20 98 15 44-5 76 33 69 74 42 18 52 70 27 102 19 34-2 80-42 90-7 42-51 66-90 47-21 28-47 33-62 29V116Z"/>
+    <path d="M152 169c-6 26 11 48 34 54" fill="none"/>
+    <path d="M121 245c24 1 42 12 51 30" fill="none"/>
+    <path d="M143 338c18-18 40-24 62-19" fill="none"/>
+    <path d="M360 169c6 26-11 48-34 54" fill="none"/>
+    <path d="M391 245c-24 1-42 12-51 30" fill="none"/>
+    <path d="M369 338c-18-18-40-24-62-19" fill="none"/>
+  </g>
+  <path d="M302 91 205 269h68l-53 154 111-190h-70l41-142Z" fill="#fff" stroke="#ff3f93" stroke-width="10" stroke-linejoin="round"/>
+</svg>
