@@ -23,6 +23,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import Welcome from "./pages/Welcome";
 
 const DOCS_URL = "https://flashquest-docs.netlify.app/";
+const LOGO_URL = "/flashquest-logo.svg";
 
 function RequireAccount({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -55,7 +56,7 @@ function Shell() {
       <header className="relative z-20 border-b border-[#faa307]/10 bg-[#03071e]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <NavLink to={user ? "/study" : "/"} className="group flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[#faa307]/25 bg-[#6a040f]/55 text-2xl shadow-lg shadow-black/30 transition group-hover:-rotate-6 group-hover:scale-105">🧠</div>
+            <img src={LOGO_URL} alt="FlashQuest" className="h-11 w-11 shrink-0 rounded-2xl shadow-lg shadow-black/30 transition group-hover:-rotate-3 group-hover:scale-105" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-lg font-black tracking-tight text-white">FlashQuest</span>
@@ -76,38 +77,15 @@ function Shell() {
 
             {user ? (
               <>
-                <NavLink
-                  to="/deck-lab"
-                  className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
-                >
-                  <span aria-hidden="true">🧪</span><span>Deck Lab</span>
-                </NavLink>
-                <NavLink
-                  to="/status"
-                  className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black 2xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
-                >
-                  <span aria-hidden="true">🗺️</span><span>Deck Map</span>
-                </NavLink>
+                <NavLink to="/deck-lab" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">🧪</span><span>Deck Lab</span></NavLink>
+                <NavLink to="/status" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black 2xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">🗺️</span><span>Deck Map</span></NavLink>
                 <SoundToggle />
-                <NavLink
-                  to="/preferences"
-                  aria-label="Settings"
-                  title="Settings"
-                  className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
-                >
-                  <span aria-hidden="true">⚙️</span><span className="hidden 2xl:inline">Settings</span>
-                </NavLink>
+                <NavLink to="/preferences" aria-label="Settings" title="Settings" className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">⚙️</span><span className="hidden 2xl:inline">Settings</span></NavLink>
                 <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button hidden items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08] 2xl:flex">📖 Docs</a>
-                <div className="flex items-center gap-2">
-                  <span className="game-chip hidden px-3 py-2 text-xs font-bold text-slate-300 2xl:inline">👋 {user.display_name}</span>
-                  <button className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" onClick={() => void signOut()}>Sign out</button>
-                </div>
+                <div className="flex items-center gap-2"><span className="game-chip hidden px-3 py-2 text-xs font-bold text-slate-300 2xl:inline">👋 {user.display_name}</span><button className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" onClick={() => void signOut()}>Sign out</button></div>
               </>
             ) : (
-              <div className="flex gap-2">
-                <NavLink className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" to="/login">Sign in</NavLink>
-                <NavLink className="game-button bg-[#ffba08] px-3 py-2 text-xs font-black text-[#370617]" to="/signup">Create account</NavLink>
-              </div>
+              <div className="flex gap-2"><NavLink className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" to="/login">Sign in</NavLink><NavLink className="game-button bg-[#ffba08] px-3 py-2 text-xs font-black text-[#370617]" to="/signup">Create account</NavLink></div>
             )}
           </div>
         </div>
@@ -134,28 +112,15 @@ function Shell() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="*" element={<div className="game-panel mx-auto max-w-lg p-8 text-center"><div className="text-5xl">🌀</div><h1 className="mt-4 text-2xl font-black text-white">Secret level not found</h1><p className="mt-2 text-slate-400">That route slipped into another dimension.</p><NavLink to={user ? "/study" : "/"} className="game-button mt-6 inline-flex bg-[#faa307] px-4 py-2 text-[#370617]">Back home</NavLink></div>} />
+          <Route path="*" element={<div className="game-panel mx-auto max-w-lg p-8 text-center"><img src={LOGO_URL} alt="FlashQuest" className="mx-auto h-16 w-16 rounded-2xl" /><h1 className="mt-4 text-2xl font-black text-white">Secret level not found</h1><p className="mt-2 text-slate-400">That route slipped into another dimension.</p><NavLink to={user ? "/study" : "/"} className="game-button mt-6 inline-flex bg-[#faa307] px-4 py-2 text-[#370617]">Back home</NavLink></div>} />
         </Routes>
       </main>
 
-      <footer className="relative z-10 mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500">
-        <span>{user ? "Learn · play · create · study together" : "Try the memory loop. Create an account when you want the full experience."}</span>
-        {user && <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">Docs ↗</a>}
-      </footer>
+      <footer className="relative z-10 mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500"><span className="flex items-center gap-2"><img src={LOGO_URL} alt="" aria-hidden="true" className="h-5 w-5 rounded-md" />{user ? "Learn · play · create · study together" : "Try the memory loop. Create an account when you want the full experience."}</span>{user && <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">Docs ↗</a>}</footer>
     </div>
   );
 }
 
 export default function App() {
-  return (
-    <ExperienceProvider>
-      <GameFeelProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <Shell />
-          </AuthProvider>
-        </BrowserRouter>
-      </GameFeelProvider>
-    </ExperienceProvider>
-  );
+  return <ExperienceProvider><GameFeelProvider><BrowserRouter><AuthProvider><Shell /></AuthProvider></BrowserRouter></GameFeelProvider></ExperienceProvider>;
 }
