@@ -167,6 +167,79 @@ select.game-input option { background: var(--ink-black); color: white; }
   text-transform: uppercase;
 }
 
+/* Quest Room workspace: intentionally lighter than the rest of the app so chat feels calm and readable. */
+.quest-room-workspace {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d8dee8;
+  border-radius: 1.6rem;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(148, 163, 184, .11), transparent 20rem),
+    radial-gradient(circle at 86% 82%, rgba(203, 213, 225, .22), transparent 21rem),
+    #f8fafc;
+  color: #172033;
+  box-shadow: 0 28px 80px rgba(3, 7, 30, .32);
+}
+
+.quest-room-workspace::before,
+.quest-room-workspace::after {
+  position: absolute;
+  z-index: 0;
+  color: rgba(100, 116, 139, .11);
+  font-size: 8rem;
+  line-height: 1;
+  pointer-events: none;
+}
+.quest-room-workspace::before { content: "📚"; left: 8%; top: 24%; transform: rotate(-10deg); filter: grayscale(1); }
+.quest-room-workspace::after { content: "📖"; right: 8%; bottom: 8%; transform: rotate(8deg); filter: grayscale(1); }
+
+.quest-room-workspace > * { position: relative; z-index: 1; }
+
+.quest-room-sidebar {
+  border-right: 1px solid #d8dee8;
+  background: rgba(241, 245, 249, .94);
+}
+
+.quest-room-channel {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  width: 100%;
+  border-radius: .7rem;
+  padding: .55rem .7rem;
+  color: #526076;
+  font-size: .82rem;
+  font-weight: 800;
+  text-align: left;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+.quest-room-channel:hover { background: #e8edf4; color: #182033; }
+.quest-room-channel.is-active { background: #ffffff; color: #111827; box-shadow: 0 1px 2px rgba(15, 23, 42, .07); }
+
+.quest-room-chat-surface {
+  background: rgba(255, 255, 255, .95);
+  color: #1e293b;
+}
+
+.quest-room-chat-message {
+  border-bottom: 1px solid #eef2f7;
+  padding: .85rem 1rem;
+}
+.quest-room-chat-message:hover { background: #f8fafc; }
+.quest-room-chat-message strong { color: #111827; }
+.quest-room-chat-message small { color: #94a3b8; }
+.quest-room-chat-message p { color: #334155; }
+
+.quest-room-composer {
+  border: 1px solid #cbd5e1;
+  border-radius: .9rem;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.quest-room-composer::placeholder { color: #94a3b8; }
+.quest-room-composer:focus { border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148, 163, 184, .16); outline: none; }
+
 .answer-pop { animation: answer-pop .36s cubic-bezier(.2, .9, .3, 1); }
 .wrong-shake { animation: wrong-shake .35s ease; }
 .floaty { animation: floaty 4s ease-in-out infinite; }
