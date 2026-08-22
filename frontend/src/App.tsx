@@ -44,9 +44,7 @@ function Shell() {
         { to: "/arcade", icon: "🎮", label: "Arcade" },
         { to: "/library", icon: "📚", label: "Library" },
         { to: "/rooms", icon: "👥", label: "Quest Rooms" },
-        { to: "/deck-lab", icon: "🧪", label: "Deck Lab" },
         { to: "/decks", icon: "🗂️", label: "My Decks" },
-        { to: "/status", icon: "🗺️", label: "Deck Map" },
       ]
     : [{ to: "/demo", icon: "⚡", label: "Try demo" }];
 
@@ -55,19 +53,22 @@ function Shell() {
       <div className="game-grid" aria-hidden="true" />
 
       <header className="relative z-20 border-b border-[#faa307]/10 bg-[#03071e]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between sm:px-6">
-          <NavLink to={user ? "/study" : "/"} className="group flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl border border-[#faa307]/25 bg-[#6a040f]/55 text-2xl shadow-lg shadow-black/30 transition group-hover:-rotate-6 group-hover:scale-105">🧠</div>
-            <div>
-              <div className="flex items-center gap-2"><span className="text-lg font-black tracking-tight text-white">FlashQuest</span><span className="rounded-full border border-[#ffba08]/25 bg-[#ffba08]/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#ffba08]">Quest Mode</span></div>
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <NavLink to={user ? "/study" : "/"} className="group flex min-w-0 items-center gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[#faa307]/25 bg-[#6a040f]/55 text-2xl shadow-lg shadow-black/30 transition group-hover:-rotate-6 group-hover:scale-105">🧠</div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-lg font-black tracking-tight text-white">FlashQuest</span>
+                <span className="whitespace-nowrap rounded-full border border-[#ffba08]/25 bg-[#ffba08]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] leading-none text-[#ffba08]">Quest Mode</span>
+              </div>
               <p className="text-xs font-medium text-slate-400">Any topic. One memory engine.</p>
             </div>
           </NavLink>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-2 lg:justify-end">
             <nav className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-white/[0.035] p-1.5" aria-label="Primary navigation">
               {navItems.map((item) => (
-                <NavLink key={`${item.to}-${item.label}`} to={item.to} className={({ isActive }) => ["flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition", isActive ? "bg-[#faa307] text-[#370617] shadow-lg shadow-black/20" : "text-slate-300 hover:bg-white/10 hover:text-white"].join(" ")}>
+                <NavLink key={`${item.to}-${item.label}`} to={item.to} className={({ isActive }) => ["flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition", isActive ? "bg-[#faa307] text-[#370617] shadow-lg shadow-black/20" : "text-slate-300 hover:bg-white/10 hover:text-white"].join(" ")}>
                   <span aria-hidden="true">{item.icon}</span><span>{item.label}</span>
                 </NavLink>
               ))}
@@ -75,6 +76,18 @@ function Shell() {
 
             {user ? (
               <>
+                <NavLink
+                  to="/deck-lab"
+                  className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
+                >
+                  <span aria-hidden="true">🧪</span><span>Deck Lab</span>
+                </NavLink>
+                <NavLink
+                  to="/status"
+                  className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black 2xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
+                >
+                  <span aria-hidden="true">🗺️</span><span>Deck Map</span>
+                </NavLink>
                 <SoundToggle />
                 <NavLink
                   to="/preferences"
@@ -82,11 +95,11 @@ function Shell() {
                   title="Settings"
                   className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}
                 >
-                  <span aria-hidden="true">⚙️</span><span className="hidden xl:inline">Settings</span>
+                  <span aria-hidden="true">⚙️</span><span className="hidden 2xl:inline">Settings</span>
                 </NavLink>
-                <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button hidden items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08] xl:flex">📖 Docs</a>
+                <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button hidden items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08] 2xl:flex">📖 Docs</a>
                 <div className="flex items-center gap-2">
-                  <span className="game-chip hidden px-3 py-2 text-xs font-bold text-slate-300 sm:inline">👋 {user.display_name}</span>
+                  <span className="game-chip hidden px-3 py-2 text-xs font-bold text-slate-300 2xl:inline">👋 {user.display_name}</span>
                   <button className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" onClick={() => void signOut()}>Sign out</button>
                 </div>
               </>
@@ -100,7 +113,7 @@ function Shell() {
         </div>
       </header>
 
-      <main key={location.pathname} className="game-page-enter relative z-10 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <main key={location.pathname} className="game-page-enter relative z-10 mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/demo" element={<Demo />} />
@@ -125,7 +138,7 @@ function Shell() {
         </Routes>
       </main>
 
-      <footer className="relative z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500">
+      <footer className="relative z-10 mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500">
         <span>{user ? "Learn · play · create · study together" : "Try the memory loop. Create an account when you want the full experience."}</span>
         {user && <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">Docs ↗</a>}
       </footer>
