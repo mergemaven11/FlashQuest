@@ -11,13 +11,13 @@ primary_region = 'dfw'
   dockerfile = "./Dockerfile"
 
 [deploy]
-  # Schema first, then idempotently repair/seed the featured curriculum.
   release_command = "sh -c 'alembic -c /app/alembic.ini upgrade head && python -m app.seed'"
 
 [env]
   PORT = "8080"
   APP_ENV = "production"
   FRONTEND_URL = "https://flaskquest.netlify.app"
+  API_PUBLIC_URL = "https://flashcards-tobias.fly.dev"
   EMAIL_DELIVERY_MODE = "resend"
 
 [[vm]]
