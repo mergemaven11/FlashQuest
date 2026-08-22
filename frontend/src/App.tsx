@@ -11,6 +11,7 @@ import Library from "./pages/Library";
 import LibraryDeck from "./pages/LibraryDeck";
 import Login from "./pages/Login";
 import MyDecks from "./pages/MyDecks";
+import OAuthCallback from "./pages/OAuthCallback";
 import Plans from "./pages/Plans";
 import Preferences from "./pages/Preferences";
 import Room from "./pages/Room";
@@ -28,10 +29,8 @@ const LOGO_URL = "/flashquest-logo.svg";
 function RequireAccount({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
-
   if (loading) return <div className="game-panel mx-auto max-w-lg p-8 text-center text-slate-400">Loading your quest…</div>;
   if (user) return children;
-
   const next = `${location.pathname}${location.search}`;
   return <Navigate to={`/signup?next=${encodeURIComponent(next)}`} replace />;
 }
@@ -52,41 +51,27 @@ function Shell() {
   return (
     <div className="game-shell min-h-screen text-slate-100">
       <div className="game-grid" aria-hidden="true" />
-
       <header className="relative z-20 border-b border-[#faa307]/10 bg-[#03071e]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <NavLink to={user ? "/study" : "/"} className="group flex min-w-0 items-center gap-3">
             <img src={LOGO_URL} alt="FlashQuest" className="h-11 w-11 shrink-0 rounded-2xl shadow-lg shadow-black/30 transition group-hover:-rotate-3 group-hover:scale-105" />
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-lg font-black tracking-tight text-white">FlashQuest</span>
-                <span className="whitespace-nowrap rounded-full border border-[#ffba08]/25 bg-[#ffba08]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] leading-none text-[#ffba08]">Quest Mode</span>
-              </div>
+              <div className="flex flex-wrap items-center gap-2"><span className="text-lg font-black tracking-tight text-white">FlashQuest</span><span className="whitespace-nowrap rounded-full border border-[#ffba08]/25 bg-[#ffba08]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] leading-none text-[#ffba08]">Quest Mode</span></div>
               <p className="text-xs font-medium text-slate-400">Any topic. One memory engine.</p>
             </div>
           </NavLink>
-
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-2 lg:justify-end">
             <nav className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-white/[0.035] p-1.5" aria-label="Primary navigation">
-              {navItems.map((item) => (
-                <NavLink key={`${item.to}-${item.label}`} to={item.to} className={({ isActive }) => ["flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition", isActive ? "bg-[#faa307] text-[#370617] shadow-lg shadow-black/20" : "text-slate-300 hover:bg-white/10 hover:text-white"].join(" ")}>
-                  <span aria-hidden="true">{item.icon}</span><span>{item.label}</span>
-                </NavLink>
-              ))}
+              {navItems.map((item) => <NavLink key={`${item.to}-${item.label}`} to={item.to} className={({ isActive }) => ["flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition", isActive ? "bg-[#faa307] text-[#370617] shadow-lg shadow-black/20" : "text-slate-300 hover:bg-white/10 hover:text-white"].join(" ")}><span aria-hidden="true">{item.icon}</span><span>{item.label}</span></NavLink>)}
             </nav>
-
-            {user ? (
-              <>
-                <NavLink to="/deck-lab" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">🧪</span><span>Deck Lab</span></NavLink>
-                <NavLink to="/status" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black 2xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">🗺️</span><span>Deck Map</span></NavLink>
-                <SoundToggle />
-                <NavLink to="/preferences" aria-label="Settings" title="Settings" className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">⚙️</span><span className="hidden 2xl:inline">Settings</span></NavLink>
-                <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button hidden items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08] 2xl:flex">📖 Docs</a>
-                <div className="flex items-center gap-2"><span className="game-chip hidden px-3 py-2 text-xs font-bold text-slate-300 2xl:inline">👋 {user.display_name}</span><button className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" onClick={() => void signOut()}>Sign out</button></div>
-              </>
-            ) : (
-              <div className="flex gap-2"><NavLink className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" to="/login">Sign in</NavLink><NavLink className="game-button bg-[#ffba08] px-3 py-2 text-xs font-black text-[#370617]" to="/signup">Create account</NavLink></div>
-            )}
+            {user ? <>
+              <NavLink to="/deck-lab" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">🧪</span><span>Deck Lab</span></NavLink>
+              <NavLink to="/status" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black 2xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">🗺️</span><span>Deck Map</span></NavLink>
+              <SoundToggle />
+              <NavLink to="/preferences" aria-label="Settings" title="Settings" className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">⚙️</span><span className="hidden 2xl:inline">Settings</span></NavLink>
+              <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button hidden items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08] 2xl:flex">📖 Docs</a>
+              <div className="flex items-center gap-2"><span className="game-chip hidden px-3 py-2 text-xs font-bold text-slate-300 2xl:inline">👋 {user.display_name}</span><button className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" onClick={() => void signOut()}>Sign out</button></div>
+            </> : <div className="flex gap-2"><NavLink className="game-button border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white" to="/login">Sign in</NavLink><NavLink className="game-button bg-[#ffba08] px-3 py-2 text-xs font-black text-[#370617]" to="/signup">Create account</NavLink></div>}
           </div>
         </div>
       </header>
@@ -95,6 +80,7 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/demo" element={<Demo />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route path="/welcome" element={<RequireAccount><Welcome /></RequireAccount>} />
           <Route path="/study" element={<RequireAccount><Study /></RequireAccount>} />
           <Route path="/arcade" element={<RequireAccount><Arcade /></RequireAccount>} />
@@ -115,7 +101,6 @@ function Shell() {
           <Route path="*" element={<div className="game-panel mx-auto max-w-lg p-8 text-center"><img src={LOGO_URL} alt="FlashQuest" className="mx-auto h-16 w-16 rounded-2xl" /><h1 className="mt-4 text-2xl font-black text-white">Secret level not found</h1><p className="mt-2 text-slate-400">That route slipped into another dimension.</p><NavLink to={user ? "/study" : "/"} className="game-button mt-6 inline-flex bg-[#faa307] px-4 py-2 text-[#370617]">Back home</NavLink></div>} />
         </Routes>
       </main>
-
       <footer className="relative z-10 mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500"><span className="flex items-center gap-2"><img src={LOGO_URL} alt="" aria-hidden="true" className="h-5 w-5 rounded-md" />{user ? "Learn · play · create · study together" : "Try the memory loop. Create an account when you want the full experience."}</span>{user && <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">Docs ↗</a>}</footer>
     </div>
   );
