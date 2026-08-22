@@ -28,12 +28,31 @@ export default function Signup() {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setMessage(null);
     try {
       const result = await signup({ display_name: displayName, email, password });
       setSentTo(result.email);
       setMessage(result.message);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create account");
+      const text = e instanceof Error ? e.message : "Could not create account";
+
+      // Signup commits the account before sending verification mail. A 503 therefore
+      // means the user exists and needs the resend flow, not another signup attempt.
+      if (text.startsWith("HTTP 503:")) {
+        setSentTo(email.trim().toLowerCase());
+        setError(
+          "Your account was created, but email delivery is temporarily unavailable. Use Resend email below once delivery is restored."
+        );
+      } else if (text.startsWith("HTTP 409:")) {
+        // Existing unverified users should be able to reach resend without guessing
+        // that they need to create a second account.
+        setSentTo(email.trim().toLowerCase());
+        setMessage(
+          "An account already exists for this email. If it is not verified yet, use Resend email. If it is verified, go to sign in."
+        );
+      } else {
+        setError(text);
+      }
     } finally {
       setLoading(false);
     }
@@ -59,7 +78,12 @@ export default function Signup() {
     try {
       setMessage(await resendVerification(sentTo));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not resend email");
+      const text = e instanceof Error ? e.message : "Could not resend email";
+      setError(
+        text.startsWith("HTTP 503:")
+          ? "Verification email delivery is still unavailable. Your account is safe; try again after the mail service is fixed."
+          : text
+      );
     } finally {
       setLoading(false);
     }
@@ -70,9 +94,11 @@ export default function Signup() {
       <div className="mx-auto max-w-xl py-10">
         <div className="game-panel p-7 text-center sm:p-10">
           <div className="text-6xl">📬</div>
-          <p className="metric-label mt-5">Almost there</p>
-          <h1 className="mt-2 text-3xl font-black text-white">Check your inbox!</h1>
-          <p className="mt-3 text-slate-300">We sent a verification link to <b className="text-[#ffba08]">{sentTo}</b>.</p>
+          <p className="metric-label mt-5">Verify your account</p>
+          <h1 className="mt-2 text-3xl font-black text-white">Finish email verification</h1>
+          <p className="mt-3 text-slate-300">
+            Your FlashQuest account uses <b className="text-[#ffba08]">{sentTo}</b>.
+          </p>
           <p className="mt-2 text-sm text-slate-500">
             {joiningRooms
               ? "Verify your email, then sign in and FlashQuest will send you to Quest Rooms."
@@ -81,7 +107,9 @@ export default function Signup() {
           {message && <p className="mt-5 rounded-xl border border-[#faa307]/20 bg-[#faa307]/10 p-3 text-sm text-[#ffba08]">{message}</p>}
           {error && <p className="mt-5 rounded-xl border border-[#d00000]/40 bg-[#6a040f]/40 p-3 text-sm text-rose-200">{error}</p>}
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button className="game-button bg-[#ffba08] px-4 py-2 text-sm font-black text-[#370617]" onClick={() => void resend()} disabled={loading}>Resend email</button>
+            <button className="game-button bg-[#ffba08] px-4 py-2 text-sm font-black text-[#370617]" onClick={() => void resend()} disabled={loading}>
+              {loading ? "Sending…" : "Resend email"}
+            </button>
             <Link className="game-button border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-black text-white" to={loginTarget}>Go to sign in</Link>
           </div>
         </div>
