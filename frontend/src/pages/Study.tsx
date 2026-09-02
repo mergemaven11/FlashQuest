@@ -44,6 +44,7 @@ export default function Study() {
   const [data, setData] = useState<StudyNext | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [typedAnswer, setTypedAnswer] = useState("");
   const [showFullAnswer, setShowFullAnswer] = useState(false);
   const [showMastery, setShowMastery] = useState(false);
   const [skippedCardIds, setSkippedCardIds] = useState<number[]>([]);
@@ -117,6 +118,7 @@ export default function Study() {
         setData(next);
         setShowHint(false);
         setShowAnswer(false);
+        setTypedAnswer("");
         setShowFullAnswer(false);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not load the next card");
@@ -204,7 +206,7 @@ export default function Study() {
       if (loading || data?.status !== "ok") return;
 
       if (event.key.toLowerCase() === "h") setShowHint(true);
-      if (event.key === " ") {
+      if (event.key === " " && typedAnswer.trim()) {
         event.preventDefault();
         setShowAnswer(true);
       }
@@ -214,7 +216,7 @@ export default function Study() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [data, loading, answer, skipCard]);
+  }, [data, loading, answer, skipCard, typedAnswer]);
 
   return (
     <div className="mx-auto grid max-w-5xl gap-6">
@@ -225,7 +227,7 @@ export default function Study() {
             Train your recall. <span className="ember-text">Level up.</span>
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-            Think first, ask for a hint if you want one, reveal the short answer, then dig deeper.
+            Commit to an answer first, ask for a hint if you want one, reveal the reference answer, then rate your recall.
           </p>
         </div>
         <div className="game-chip flex flex-wrap gap-3 px-4 py-2 text-xs font-bold text-slate-300">
@@ -249,9 +251,9 @@ export default function Study() {
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           {[
             ["1", "🎯", "Pick", "Choose what you want to learn."],
-            ["2", "👀", "Think", "Try it in your head first."],
+            ["2", "✍️", "Answer", "Write what you think before revealing."],
             ["3", "💡", "Hint", "Ask for a nudge if you need it."],
-            ["4", "✨", "Reveal", "Get the TL;DR, then full answer."],
+            ["4", "✨", "Reveal", "Compare your answer with the reference."],
             ["5", "✅", "Rate", "Missed it or got it?"],
             ["6", "⚡", "Continue", "Weak cards come back sooner."],
           ].map(([step, icon, title, detail]) => (
@@ -443,7 +445,17 @@ export default function Study() {
                 </h2>
 
                 {!showAnswer && (
-                  <div className="mt-8 flex flex-wrap justify-center gap-3">
+                  <div className="mx-auto mt-8 grid max-w-2xl gap-4 text-left">
+                    <label className="grid gap-2">
+                      <span className="text-sm font-black text-white">Your answer</span>
+                      <textarea
+                        className="game-input min-h-28 resize-y"
+                        value={typedAnswer}
+                        onChange={(event) => setTypedAnswer(event.target.value)}
+                        placeholder="Commit to your answer before you reveal it…"
+                      />
+                    </label>
+                    <div className="flex flex-wrap justify-center gap-3">
                     <button
                       className="game-button border border-violet-400/30 bg-violet-400/10 px-5 py-3 font-black text-violet-100"
                       onClick={() => setShowHint(true)}
@@ -451,11 +463,13 @@ export default function Study() {
                       💡 {showHint ? "Hint shown" : "Give me a hint"}
                     </button>
                     <button
-                      className="game-button bg-[#ffba08] px-6 py-3 font-black text-[#370617]"
+                      className="game-button bg-[#ffba08] px-6 py-3 font-black text-[#370617] disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => setShowAnswer(true)}
+                      disabled={!typedAnswer.trim()}
                     >
                       ✨ Reveal answer
                     </button>
+                    </div>
                   </div>
                 )}
 
@@ -470,6 +484,10 @@ export default function Study() {
 
                 {showAnswer && (
                   <div className="mx-auto mt-8 grid max-w-2xl gap-4 text-left">
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">You answered</p>
+                      <p className="mt-3 whitespace-pre-wrap text-base font-bold leading-7 text-white">{typedAnswer}</p>
+                    </div>
                     <div className="answer-pop rounded-2xl border border-cyan-300/30 bg-cyan-300/[0.08] p-5">
                       <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">⚡ TL;DR</p>
                       <p className="mt-3 text-lg font-black leading-8 text-cyan-50">
@@ -498,23 +516,40 @@ export default function Study() {
             </div>
           </article>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <button
-              className="game-button border border-[#d00000]/40 bg-[#6a040f]/45 px-5 py-4 text-left text-rose-100"
-              onClick={() => void answer("wrong")}
-              disabled={loading}
-            >
-              <b className="block text-sm">1 · Missed it</b>
-              <span className="mt-1 block text-xs text-rose-200/70">Bring it back sooner</span>
-            </button>
-            <button
-              className="game-button border border-[#faa307]/40 bg-[#e85d04]/20 px-5 py-4 text-left text-[#ffba08]"
-              onClick={() => void answer("correct")}
-              disabled={loading}
-            >
-              <b className="block text-sm">2 · Got it</b>
-              <span className="mt-1 block text-xs text-[#ffba08]/70">Advance mastery + combo</span>
-            </button>
+          {showAnswer ? (
+            <div className="grid gap-3">
+              <div className="rounded-2xl border border-[#ffba08]/25 bg-[#ffba08]/[0.08] p-4 text-center">
+                <h3 className="text-lg font-black text-white">Did you get it?</h3>
+                <p className="mt-1 text-xs text-slate-400">Compare your answer with the reference, then rate your recall.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <button
+                  className="game-button border border-[#d00000]/40 bg-[#6a040f]/45 px-5 py-4 text-left text-rose-100"
+                  onClick={() => void answer("wrong")}
+                  disabled={loading}
+                >
+                  <b className="block text-sm">1 · Missed it</b>
+                  <span className="mt-1 block text-xs text-rose-200/70">Bring it back sooner</span>
+                </button>
+                <button
+                  className="game-button border border-[#faa307]/40 bg-[#e85d04]/20 px-5 py-4 text-left text-[#ffba08]"
+                  onClick={() => void answer("correct")}
+                  disabled={loading}
+                >
+                  <b className="block text-sm">2 · Got it</b>
+                  <span className="mt-1 block text-xs text-[#ffba08]/70">Advance mastery + combo</span>
+                </button>
+                <button
+                  className="game-button border border-white/10 bg-white/[0.04] px-5 py-4 text-left text-slate-200"
+                  onClick={() => void skipCard()}
+                  disabled={loading}
+                >
+                  <b className="block text-sm">S · Skip</b>
+                  <span className="mt-1 block text-xs text-slate-500">Draw a different eligible card</span>
+                </button>
+              </div>
+            </div>
+          ) : (
             <button
               className="game-button border border-white/10 bg-white/[0.04] px-5 py-4 text-left text-slate-200"
               onClick={() => void skipCard()}
@@ -523,7 +558,7 @@ export default function Study() {
               <b className="block text-sm">S · Skip</b>
               <span className="mt-1 block text-xs text-slate-500">Draw a different eligible card</span>
             </button>
-          </div>
+          )}
 
           <div className="game-panel overflow-hidden">
             <button
