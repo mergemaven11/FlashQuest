@@ -1,13 +1,19 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+
+type BillingCycle = "monthly" | "annual";
+
 const plans = [
   {
     name: "Free",
-    price: "$0",
-    cadence: "forever",
+    monthly: 0,
+    annual: 0,
     badge: "Core learning",
-    summary: "Everything needed to learn, build a deck, and study with the community.",
+    summary: "Everything you need to build a real study habit and use FlashQuest every day.",
     features: [
-      "Official decks and durable study progress",
-      "Library browsing and community decks",
+      "Official and community decks",
+      "Durable study progress + mastery scheduling",
+      "Answer-first recall and hints",
       "Solo Arcade games",
       "Create, remix, and publish decks",
       "Public Quest Rooms",
@@ -16,94 +22,136 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "$7.99",
-    cadence: "/ month",
-    badge: "Planned",
-    summary: "Power features for learners who want deeper progress insight and more private control.",
+    monthly: 7.99,
+    annual: 69,
+    badge: "Most popular",
+    summary: "For serious learners who want deeper insight, more privacy, and more control.",
     features: [
       "Everything in Free",
-      "Advanced progress and mastery analytics",
-      "More private and invite-only room capacity",
-      "Larger Quest Rooms",
-      "Priority access to future power workflows",
+      "Advanced mastery + progress analytics",
+      "Private and invite-only Quest Rooms",
+      "Larger room capacity",
+      "Premium study and Arcade workflows",
+      "Priority access to new power features",
     ],
     featured: true,
   },
   {
     name: "Educator",
-    price: "$19.99",
-    cadence: "/ month",
-    badge: "Planned",
-    summary: "Teaching and cohort tools for instructors, tutors, and study-group leaders.",
+    monthly: 19.99,
+    annual: 179,
+    badge: "For instructors",
+    summary: "For tutors, teachers, coaches, and study leaders running learning groups.",
     features: [
       "Everything in Pro",
-      "Multiple learner groups and cohorts",
-      "Educator-facing progress views",
+      "Multiple learner cohorts",
+      "Educator-facing learner progress views",
       "Expanded room and deck organization",
-      "Future assignment and classroom workflows",
+      "Assignments and classroom workflows",
+      "Cohort-level learning analytics",
     ],
     featured: false,
   },
 ] as const;
 
+function money(value: number) {
+  return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`;
+}
+
 export default function Plans() {
+  const [billing, setBilling] = useState<BillingCycle>("annual");
+
   return (
     <div className="mx-auto grid max-w-6xl gap-7">
-      <section>
-        <p className="metric-label">💳 Plans</p>
-        <h1 className="mt-2 text-4xl font-black tracking-tight text-white sm:text-5xl">
+      <section className="text-center">
+        <p className="metric-label">💳 FlashQuest pricing</p>
+        <h1 className="mx-auto mt-2 max-w-4xl text-4xl font-black tracking-tight text-white sm:text-6xl">
           Start free. <span className="ember-text">Upgrade when it earns it.</span>
         </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
-          Core learning stays free. Paid tiers are reserved for power features, larger private collaboration, and educator workflows.
+        <p className="mx-auto mt-4 max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
+          Core learning stays free. Paid plans unlock deeper analytics, private collaboration, and educator workflows — not basic studying.
         </p>
+
+        <div className="mx-auto mt-6 inline-flex rounded-2xl border border-white/10 bg-black/20 p-1.5">
+          <button
+            type="button"
+            className={`rounded-xl px-4 py-2 text-sm font-black transition ${billing === "monthly" ? "bg-[#faa307] text-[#370617]" : "text-slate-300"}`}
+            onClick={() => setBilling("monthly")}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            className={`rounded-xl px-4 py-2 text-sm font-black transition ${billing === "annual" ? "bg-[#faa307] text-[#370617]" : "text-slate-300"}`}
+            onClick={() => setBilling("annual")}
+          >
+            Annual · save up to 28%
+          </button>
+        </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {plans.map((plan) => (
-          <article
-            key={plan.name}
-            className={`game-panel flex h-full flex-col p-6 ${plan.featured ? "border-[#faa307]/45 bg-[#faa307]/[0.055]" : ""}`}
-          >
-            <div className="flex items-start justify-between gap-3">
+        {plans.map((plan) => {
+          const annual = billing === "annual" && plan.annual > 0;
+          const displayedPrice = plan.monthly === 0 ? "$0" : annual ? money(plan.annual) : money(plan.monthly);
+          const cadence = plan.monthly === 0 ? "forever" : annual ? "/ year" : "/ month";
+
+          return (
+            <article
+              key={plan.name}
+              className={`game-panel relative flex h-full flex-col p-6 ${plan.featured ? "border-[#faa307]/55 bg-[#faa307]/[0.07] shadow-2xl shadow-[#370617]/30" : ""}`}
+            >
+              {plan.featured && (
+                <span className="absolute right-5 top-5 rounded-full bg-[#ffba08] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#370617]">
+                  Best value
+                </span>
+              )}
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.14em] text-[#ffba08]">{plan.badge}</p>
-                <h2 className="mt-2 text-2xl font-black text-white">{plan.name}</h2>
+                <h2 className="mt-2 text-3xl font-black text-white">{plan.name}</h2>
               </div>
-              {plan.name === "Free" && <span className="game-chip px-3 py-1 text-xs font-black text-slate-300">Current</span>}
-            </div>
 
-            <div className="mt-5 flex items-end gap-2">
-              <span className="text-4xl font-black text-white">{plan.price}</span>
-              <span className="pb-1 text-sm font-bold text-slate-500">{plan.cadence}</span>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-slate-400">{plan.summary}</p>
+              <div className="mt-5 flex items-end gap-2">
+                <span className="text-4xl font-black text-white">{displayedPrice}</span>
+                <span className="pb-1 text-sm font-bold text-slate-500">{cadence}</span>
+              </div>
+              {annual && (
+                <p className="mt-1 text-xs font-bold text-emerald-300">
+                  About {money(plan.annual / 12)}/month billed annually
+                </p>
+              )}
+              <p className="mt-4 text-sm leading-6 text-slate-400">{plan.summary}</p>
 
-            <ul className="mt-5 grid flex-1 gap-3 text-sm text-slate-300">
-              {plan.features.map((feature) => (
-                <li key={feature} className="flex gap-2">
-                  <span className="text-[#faa307]" aria-hidden="true">✓</span>
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
+              <ul className="mt-5 grid flex-1 gap-3 text-sm text-slate-300">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex gap-2">
+                    <span className="text-[#faa307]" aria-hidden="true">✓</span>
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
 
-            <button
-              type="button"
-              disabled
-              className="game-button mt-6 w-full border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black text-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {plan.name === "Free" ? "Free plan active" : "Checkout coming soon"}
-            </button>
-          </article>
-        ))}
+              <Link
+                className={`game-button mt-6 w-full px-4 py-3 text-center text-sm font-black ${plan.featured ? "bg-[#ffba08] text-[#370617]" : "border border-white/10 bg-white/[0.04] text-white"}`}
+                to="/signup"
+              >
+                {plan.name === "Free" ? "Start free" : `Choose ${plan.name}`}
+              </Link>
+            </article>
+          );
+        })}
       </div>
 
-      <section className="game-panel p-5 sm:p-6">
-        <p className="font-black text-white">Billing is not enabled yet.</p>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          These are planned launch prices, not an active subscription offer. FlashQuest will only enable checkout after plan entitlements and billing are wired and tested end to end.
-        </p>
+      <section className="game-panel grid gap-3 p-5 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="font-black text-white">Launch pricing is visible now; checkout comes after billing UAT.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            No card is required for the Free plan. Pro and Educator prices are the intended launch tiers, but paid checkout stays disabled until entitlements, subscription state, cancellation, and webhook handling are tested end to end.
+          </p>
+        </div>
+        <Link className="game-button bg-[#faa307] px-5 py-3 text-center font-black text-[#370617]" to="/demo">
+          Try the demo →
+        </Link>
       </section>
     </div>
   );
