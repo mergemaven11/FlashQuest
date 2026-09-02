@@ -1,0 +1,33 @@
+PROPRIETARY LICENSE
+
+Copyright (c) 2026 mergemaven11. All rights reserved.
+
+This repository and its contents, including source code, documentation, designs,
+assets, data models, and related materials (the "Software"), are proprietary.
+
+The Software is made publicly viewable solely for portfolio review, security
+review, and evaluation. No license or permission is granted to copy, reproduce,
+modify, adapt, merge, publish, distribute, sublicense, sell, commercially use,
+rehost, create derivative works from, or incorporate the Software into another
+product or service.
+
+Use of the Software or its contents to train, fine-tune, evaluate, or supply
+training data to an artificial intelligence or machine-learning system is also
+prohibited without prior written permission.
+
+You may clone and run the Software locally only for private evaluation, provided
+that you do not redistribute it, use it in production, or remove copyright and
+proprietary notices.
+
+Any permission beyond this limited evaluation right requires prior written
+authorization from the copyright holder. Contact the repository owner through
+GitHub to request permission.
+
+Third-party dependencies and separately identified third-party materials remain
+subject to their respective licenses.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR IN
+CONNECTION WITH THE SOFTWARE OR ITS USE.
