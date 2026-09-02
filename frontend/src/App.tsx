@@ -46,7 +46,10 @@ function Shell() {
         { to: "/rooms", icon: "👥", label: "Quest Rooms" },
         { to: "/decks", icon: "🗂️", label: "My Decks" },
       ]
-    : [{ to: "/demo", icon: "⚡", label: "Try demo" }];
+    : [
+        { to: "/demo", icon: "⚡", label: "Try demo" },
+        { to: "/plans", icon: "💳", label: "Pricing" },
+      ];
 
   return (
     <div className="game-shell min-h-screen text-slate-100">
@@ -67,6 +70,7 @@ function Shell() {
             {user ? <>
               <NavLink to="/deck-lab" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">🧪</span><span>Deck Lab</span></NavLink>
               <NavLink to="/status" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black 2xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">🗺️</span><span>Deck Map</span></NavLink>
+              <NavLink to="/plans" className={({ isActive }) => `game-button game-chip hidden items-center gap-2 px-3 py-2 text-xs font-black 2xl:flex ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">💳</span><span>Plans</span></NavLink>
               <SoundToggle />
               <NavLink to="/preferences" aria-label="Settings" title="Settings" className={({ isActive }) => `game-button game-chip flex items-center gap-2 px-3 py-2 text-xs font-black ${isActive ? "text-[#ffba08]" : "text-slate-200"}`}><span aria-hidden="true">⚙️</span><span className="hidden 2xl:inline">Settings</span></NavLink>
               <a href={DOCS_URL} target="_blank" rel="noreferrer" className="game-button hidden items-center gap-2 border border-[#faa307]/20 bg-[#370617]/55 px-3 py-2 text-sm text-[#ffba08] 2xl:flex">📖 Docs</a>
@@ -80,6 +84,7 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/demo" element={<Demo />} />
+          <Route path="/plans" element={<Plans />} />
           <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route path="/welcome" element={<RequireAccount><Welcome /></RequireAccount>} />
           <Route path="/study" element={<RequireAccount><Study /></RequireAccount>} />
@@ -94,14 +99,13 @@ function Shell() {
           <Route path="/decks" element={<RequireAccount><MyDecks /></RequireAccount>} />
           <Route path="/status" element={<RequireAccount><Status /></RequireAccount>} />
           <Route path="/preferences" element={<RequireAccount><Preferences /></RequireAccount>} />
-          <Route path="/plans" element={<RequireAccount><Plans /></RequireAccount>} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="*" element={<div className="game-panel mx-auto max-w-lg p-8 text-center"><img src={LOGO_URL} alt="FlashQuest" className="mx-auto h-16 w-16 rounded-2xl" /><h1 className="mt-4 text-2xl font-black text-white">Secret level not found</h1><p className="mt-2 text-slate-400">That route slipped into another dimension.</p><NavLink to={user ? "/study" : "/"} className="game-button mt-6 inline-flex bg-[#faa307] px-4 py-2 text-[#370617]">Back home</NavLink></div>} />
         </Routes>
       </main>
-      <footer className="relative z-10 mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500"><span className="flex items-center gap-2"><img src={LOGO_URL} alt="" aria-hidden="true" className="h-5 w-5 rounded-md" />{user ? "Learn · play · create · study together" : "Try the memory loop. Create an account when you want the full experience."}</span>{user && <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">Docs ↗</a>}</footer>
+      <footer className="relative z-10 mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 pb-8 text-xs font-medium text-slate-500"><span className="flex items-center gap-2"><img src={LOGO_URL} alt="" aria-hidden="true" className="h-5 w-5 rounded-md" />{user ? "Learn · play · create · study together" : "Try the memory loop. Create an account when you want the full experience."}</span><div className="flex items-center gap-4"><NavLink className="transition hover:text-[#ffba08]" to="/plans">Pricing</NavLink>{user && <a className="transition hover:text-[#ffba08]" href={DOCS_URL} target="_blank" rel="noreferrer">Docs ↗</a>}</div></footer>
     </div>
   );
 }
