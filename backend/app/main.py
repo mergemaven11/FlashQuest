@@ -32,7 +32,7 @@ def _allowed_origins() -> list[str]:
     defaults = {
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://flaskquest.netlify.app",
+        "https://flashquestt.netlify.app",
     }
     raw = (settings.ALLOWED_ORIGINS or "").strip()
     if not raw:
