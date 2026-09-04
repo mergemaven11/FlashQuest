@@ -6,6 +6,7 @@
   NODE_VERSION = "20"
   VITE_API_URL = "https://flashcards-tobias.fly.dev" #  Fly API URL
 
+# Production site: https://flashquestt.netlify.app
 # SPA fallback so deep links work
 [[redirects]]
   from = "/*"
