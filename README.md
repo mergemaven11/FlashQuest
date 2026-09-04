@@ -14,7 +14,7 @@ Start instantly with a featured **216-card Platform Engineering deck**, then cre
 [![Docs Build](https://github.com/mergemaven11/FlashQuest/actions/workflows/docs-deploy.yml/badge.svg)](https://github.com/mergemaven11/FlashQuest/actions/workflows/docs-deploy.yml)
 [![Docs](https://img.shields.io/badge/docs-live-ffba08)](https://flashquest-docs.netlify.app/)
 
-**App:** https://flaskquest.netlify.app/  
+**App:** https://flashquestt.netlify.app/  
 **Docs:** https://flashquest-docs.netlify.app/
 
 ---
@@ -214,8 +214,8 @@ For local email verification, watch API logs after signup for the verification U
 ### React / Netlify
 
 ```text
-Site: flaskquest
-URL: https://flaskquest.netlify.app/
+Site: flashquestt
+URL: https://flashquestt.netlify.app/
 Base directory: frontend
 Build command: npm run build
 Publish directory: dist
