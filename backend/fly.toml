@@ -16,7 +16,7 @@ primary_region = 'dfw'
 [env]
   PORT = "8080"
   APP_ENV = "production"
-  FRONTEND_URL = "https://flaskquest.netlify.app"
+  FRONTEND_URL = "https://flashquestt.netlify.app"
   API_PUBLIC_URL = "https://flashcards-tobias.fly.dev"
   EMAIL_DELIVERY_MODE = "resend"
 
