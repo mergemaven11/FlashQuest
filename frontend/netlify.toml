@@ -1,13 +1,34 @@
+# This file supports Netlify projects whose Base directory is set to frontend/.
+# It intentionally produces the same deploy artifact as the repo-root netlify.toml:
+#   /       -> Vite app
+#   /docs/  -> MkDocs documentation
+
 [build]
-  command = "npm ci && npm run build"
+  command = """
+  set -e
+  npm ci
+  npm run build
+  npm run docs
+  cd ..
+  python -m venv .venv
+  . .venv/bin/activate
+  python -m pip install --upgrade pip
+  pip install mkdocs mkdocs-material "mkdocstrings[python]"
+  pip install -r backend/requirements.txt
+  python -m mkdocs build --strict --site-dir frontend/dist/docs
+  """
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
-  VITE_API_URL = "https://flashcards-tobias.fly.dev" #  Fly API URL
+  PYTHON_VERSION = "3.12"
+  NODE_VERSION = "20.19.0"
+  VITE_API_URL = "https://flashcards-tobias.fly.dev"
 
-# Production site: https://flashquestt.netlify.app
-# SPA fallback so deep links work
+[[redirects]]
+  from = "/docs"
+  to = "/docs/"
+  status = 301
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
