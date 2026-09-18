@@ -19,10 +19,10 @@ Start instantly with a featured **216-card Platform Engineering deck**, then cre
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
 [![Last Commit](https://img.shields.io/github/last-commit/mergemaven11/FlashQuest)](https://github.com/mergemaven11/FlashQuest/commits/main)
-[![Docs](https://img.shields.io/badge/docs-live-ffba08)](https://flashquest-docs.netlify.app/)
+[![Docs](https://img.shields.io/badge/docs-FlashQuest%2Fdocs-ffba08)](https://flashquestt.netlify.app/docs/)
 
 **App:** https://flashquestt.netlify.app/  
-**Docs:** https://flashquest-docs.netlify.app/
+**Docs:** https://flashquestt.netlify.app/docs/
 
 ---
 
@@ -233,7 +233,7 @@ VITE_API_URL=https://flashcards-tobias.fly.dev
 
 ```text
 Site: flashquest-docs
-URL: https://flashquest-docs.netlify.app/
+URL: https://flashquestt.netlify.app/docs/
 Publish directory: site
 ```
 
