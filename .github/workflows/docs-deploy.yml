@@ -1,4 +1,4 @@
-name: Docs – Build Check (MkDocs + TypeDoc)
+name: Docs – Build Check for /docs (MkDocs + TypeDoc)
 
 on:
   pull_request:
