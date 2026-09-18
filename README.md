@@ -12,6 +12,13 @@ Start instantly with a featured **216-card Platform Engineering deck**, then cre
 
 [![CI](https://github.com/mergemaven11/FlashQuest/actions/workflows/ci.yml/badge.svg)](https://github.com/mergemaven11/FlashQuest/actions/workflows/ci.yml)
 [![Docs Build](https://github.com/mergemaven11/FlashQuest/actions/workflows/docs-deploy.yml/badge.svg)](https://github.com/mergemaven11/FlashQuest/actions/workflows/docs-deploy.yml)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/bcbfbe73-3a3e-441f-9bb3-2d6f9d78e1c4/deploy-status)](https://app.netlify.com/projects/flashquestt/deploys)
+[![Live Demo](https://img.shields.io/badge/Live-FlashQuest-37bfa4)](https://flashquestt.netlify.app/)
+![React](https://img.shields.io/badge/React-Frontend-61DAFB?logo=react&logoColor=111)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
+[![Last Commit](https://img.shields.io/github/last-commit/mergemaven11/FlashQuest)](https://github.com/mergemaven11/FlashQuest/commits/main)
 [![Docs](https://img.shields.io/badge/docs-live-ffba08)](https://flashquest-docs.netlify.app/)
 
 **App:** https://flashquestt.netlify.app/  
