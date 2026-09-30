@@ -8,8 +8,8 @@ const plans = [
     name: "Free",
     monthly: 0,
     annual: 0,
-    badge: "Core learning",
-    summary: "Everything you need to build a real study habit and use FlashQuest every day.",
+    badge: "Free forever",
+    summary: "The full core learning loop stays free, supported by quiet sponsor placements outside the study interaction.",
     features: [
       "Official and community decks",
       "Durable study progress + mastery scheduling",
@@ -17,6 +17,7 @@ const plans = [
       "Solo Arcade games",
       "Create, remix, and publish decks",
       "Public Quest Rooms",
+      "Non-invasive sponsor placements",
     ],
     featured: false,
   },
@@ -25,9 +26,10 @@ const plans = [
     monthly: 7.99,
     annual: 69,
     badge: "Most popular",
-    summary: "For serious learners who want deeper insight, more privacy, and more control.",
+    summary: "For serious learners who want deeper insight, more privacy, more control, and an ad-free experience.",
     features: [
       "Everything in Free",
+      "Ad-free FlashQuest",
       "Advanced mastery + progress analytics",
       "Private and invite-only Quest Rooms",
       "Larger room capacity",
@@ -41,9 +43,10 @@ const plans = [
     monthly: 19.99,
     annual: 179,
     badge: "For instructors",
-    summary: "For tutors, teachers, coaches, and study leaders running learning groups.",
+    summary: "For tutors, teachers, coaches, and study leaders running ad-free learning groups.",
     features: [
       "Everything in Pro",
+      "Ad-free learner and educator experience",
       "Multiple learner cohorts",
       "Educator-facing learner progress views",
       "Expanded room and deck organization",
@@ -66,10 +69,10 @@ export default function Plans() {
       <section className="text-center">
         <p className="metric-label">💳 FlashQuest pricing</p>
         <h1 className="mx-auto mt-2 max-w-4xl text-4xl font-black tracking-tight text-white sm:text-6xl">
-          Start free. <span className="ember-text">Upgrade when it earns it.</span>
+          Learn free. <span className="ember-text">Upgrade for power, privacy, and no ads.</span>
         </h1>
         <p className="mx-auto mt-4 max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
-          Core learning stays free. Paid plans unlock deeper analytics, private collaboration, and educator workflows — not basic studying.
+          Core learning stays free. The Free tier is supported by quiet sponsor placements that never interrupt a question, answer, reveal, or mastery decision.
         </p>
 
         <div className="mx-auto mt-6 inline-flex rounded-2xl border border-white/10 bg-black/20 p-1.5">
@@ -144,9 +147,9 @@ export default function Plans() {
 
       <section className="game-panel grid gap-3 p-5 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
-          <p className="font-black text-white">Launch pricing is visible now; checkout comes after billing UAT.</p>
+          <p className="font-black text-white">Our ad promise</p>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            No card is required for the Free plan. Pro and Educator prices are the intended launch tiers, but paid checkout stays disabled until entitlements, subscription state, cancellation, and webhook handling are tested end to end.
+            No popups. No interstitials. No autoplay. No ads between questions. No ad inside the answer or reveal experience. Sponsor inventory belongs around learning, never in the middle of it.
           </p>
         </div>
         <Link className="game-button bg-[#faa307] px-5 py-3 text-center font-black text-[#370617]" to="/demo">
